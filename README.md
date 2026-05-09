@@ -1,1 +1,1 @@
-# tcp-grader
+# tcg-grader
