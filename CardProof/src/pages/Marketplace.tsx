@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { Search, SlidersHorizontal, TrendingUp, Zap, Loader2 } from "lucide-react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { Search, SlidersHorizontal, TrendingUp, Zap, Loader2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import MarketplaceCard from "@/components/MarketplaceCard";
+import ListCardModal from "@/components/ListCardModal";
 import { useProgram } from "@/lib/useProgram";
 import { fetchAllListings, lamportsToSol } from "@/lib/blockchain";
 
@@ -139,11 +141,12 @@ const Marketplace: React.FC = () => {
   const [sortBy, setSortBy] = useState("Recent");
   const [chainListings, setChainListings] = useState<ListingItem[]>([]);
   const [loadingChain, setLoadingChain] = useState(false);
+  const [listModalOpen, setListModalOpen] = useState(false);
 
   const { program } = useProgram();
 
-  // ── Fetch on-chain listings when program is ready ─────────────────────────
-  useEffect(() => {
+  // ── Fetch on-chain listings ──────────────────────────────────────────────
+  const refreshChain = useCallback(() => {
     if (!program) return;
     setLoadingChain(true);
     fetchAllListings(program)
@@ -163,6 +166,8 @@ const Marketplace: React.FC = () => {
       .catch(console.error)
       .finally(() => setLoadingChain(false));
   }, [program]);
+
+  useEffect(() => { refreshChain(); }, [refreshChain]);
 
   const allListings = useMemo((): ListingItem[] => {
     return [...demoListings, ...chainListings];
@@ -214,6 +219,15 @@ const Marketplace: React.FC = () => {
                 <h1 className="font-display text-3xl sm:text-4xl font-700 text-foreground">Marketplace</h1>
                 <p className="mt-1.5 text-sm text-muted-foreground">AI-verified Pokémon card NFTs on Solana</p>
               </div>
+              <Button
+                onClick={() => setListModalOpen(true)}
+                className="rounded-xl px-5 py-2.5 text-sm font-600 flex items-center gap-2 relative overflow-hidden group/lst"
+                style={{ background: "linear-gradient(135deg, hsl(252 68% 68%), hsl(270 65% 60%))" }}
+              >
+                <div className="absolute inset-0 bg-white/0 group-hover/lst:bg-white/10 transition-colors" />
+                <Plus className="h-4 w-4" />
+                List Card
+              </Button>
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5 text-secondary" />
@@ -308,6 +322,12 @@ const Marketplace: React.FC = () => {
           )}
         </div>
       </div>
+
+      <ListCardModal
+        open={listModalOpen}
+        onOpenChange={setListModalOpen}
+        onListed={refreshChain}
+      />
     </div>
   );
 };

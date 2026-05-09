@@ -32,7 +32,9 @@ export function findListingPda(nftMint: PublicKey): [PublicKey, number] {
 
 /**
  * Lists an NFT on the marketplace.
- * Escrows the NFT from seller's token account into the program-owned escrow.
+ * Generates a fresh escrow keypair, transfers NFT into program-owned escrow.
+ *
+ * Returns { sig, escrowPubkey } — store escrowPubkey to use during buy/delist.
  *
  * @param priceInSol  Price in SOL (converted to lamports internally)
  */
@@ -41,11 +43,13 @@ export async function listNft(
   seller: PublicKey,
   nftMint: PublicKey,
   sellerNftTokenAccount: PublicKey,
-  escrowNftTokenAccount: PublicKey,
   priceInSol: number
-): Promise<string> {
+): Promise<{ sig: string; escrowPubkey: string }> {
   const [listing] = findListingPda(nftMint);
   const price = new BN(Math.floor(priceInSol * LAMPORTS_PER_SOL));
+
+  // Fresh keypair for the escrow token account (initialized by the program)
+  const escrowKeypair = web3.Keypair.generate();
 
   const sig = await (program.methods as any)
     .list(price)
@@ -54,14 +58,15 @@ export async function listNft(
       nftMint,
       sellerNftTokenAccount,
       listing,
-      escrowNftTokenAccount,
+      escrowNftTokenAccount: escrowKeypair.publicKey,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY,
     })
+    .signers([escrowKeypair])
     .rpc();
 
-  return sig;
+  return { sig, escrowPubkey: escrowKeypair.publicKey.toBase58() };
 }
 
 /**

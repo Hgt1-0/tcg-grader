@@ -11,7 +11,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
 import { useProgram } from "@/lib/useProgram";
-import { buyNft } from "@/lib/blockchain";
+import { buyNft, delistNft, findListingPda } from "@/lib/blockchain";
 import { useToast } from "@/hooks/use-toast";
 
 interface MarketplaceCardProps {
@@ -57,6 +57,7 @@ const MarketplaceCard: React.FC<MarketplaceCardProps> = ({
   const [liked, setLiked] = useState(false);
   const [open, setOpen] = useState(false);
   const [buyStatus, setBuyStatus] = useState<"idle" | "loading" | "done">("idle");
+  const [delistStatus, setDelistStatus] = useState<"idle" | "loading" | "done">("idle");
 
   const cat = categoryColors[category] ?? { text: "text-muted-foreground", bg: "bg-muted/50", dot: "bg-muted-foreground" };
   const breakdown = useMemo(() => gradeToBreakdown(grade), [grade]);
@@ -65,6 +66,10 @@ const MarketplaceCard: React.FC<MarketplaceCardProps> = ({
   const { setVisible } = useWalletModal();
   const { program, wallet } = useProgram();
   const { toast } = useToast();
+
+  // Is the connected wallet the seller of this on-chain listing?
+  const isOwner = onChain && publicKey && seller &&
+    publicKey.toBase58().startsWith(seller.split("...")[0]) === true;
 
   const handleBuy = async () => {
     if (!publicKey) {
@@ -104,6 +109,37 @@ const MarketplaceCard: React.FC<MarketplaceCardProps> = ({
     } catch (err: any) {
       setBuyStatus("idle");
       toast({ title: "Purchase failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    }
+  };
+
+  const handleDelist = async () => {
+    if (!program || !wallet.publicKey || !nftMint) return;
+    setDelistStatus("loading");
+    try {
+      const { getAssociatedTokenAddress } = await import("@solana/spl-token");
+      const mint = new PublicKey(nftMint);
+      const sellerAta = await getAssociatedTokenAddress(mint, wallet.publicKey);
+      const stored = JSON.parse(localStorage.getItem("cardproof_escrows") ?? "{}");
+      const escrowPubkey = stored[mint.toBase58()];
+      if (!escrowPubkey) throw new Error("Escrow account not found. Was this card listed from this browser?");
+
+      const sig = await delistNft(
+        program,
+        wallet.publicKey,
+        mint,
+        new PublicKey(escrowPubkey),
+        sellerAta
+      );
+
+      // Remove from local escrow store
+      delete stored[mint.toBase58()];
+      localStorage.setItem("cardproof_escrows", JSON.stringify(stored));
+
+      setDelistStatus("done");
+      toast({ title: "Card Delisted", description: `Tx: ${sig.slice(0, 16)}…` });
+    } catch (err: any) {
+      setDelistStatus("idle");
+      toast({ title: "Delist failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     }
   };
 
@@ -302,29 +338,54 @@ const MarketplaceCard: React.FC<MarketplaceCardProps> = ({
                   <CheckCircle2 className="h-5 w-5 text-secondary" />
                   <span className="text-sm font-600 text-secondary">Purchase submitted!</span>
                 </div>
-              ) : (
-                <Button
-                  size="lg"
-                  onClick={handleBuy}
-                  disabled={buyStatus === "loading"}
-                  className="w-full rounded-xl py-5 text-base font-600 relative overflow-hidden group"
-                  style={{ background: "linear-gradient(135deg, hsl(252 68% 68%), hsl(270 65% 60%))" }}
-                >
-                  <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
-                  {buyStatus === "loading" ? (
-                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Processing…</>
-                  ) : !publicKey ? (
-                    <><Wallet className="mr-2 h-5 w-5" />Connect Wallet to Buy</>
+              ) : isOwner ? (
+                // Seller sees Delist instead of Buy
+                <>
+                  {delistStatus === "done" ? (
+                    <div className="flex items-center justify-center gap-2 rounded-xl py-4 border border-orange-500/30 bg-orange-500/5">
+                      <CheckCircle2 className="h-5 w-5 text-orange-400" />
+                      <span className="text-sm font-600 text-orange-400">Card Delisted</span>
+                    </div>
                   ) : (
-                    <><Award className="mr-2 h-5 w-5" />Confirm Purchase</>
+                    <Button
+                      size="lg"
+                      onClick={handleDelist}
+                      disabled={delistStatus === "loading"}
+                      className="w-full rounded-xl py-5 text-base font-600 relative overflow-hidden group"
+                      style={{ background: "linear-gradient(135deg, hsl(30 90% 55%), hsl(20 85% 48%))" }}
+                    >
+                      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+                      {delistStatus === "loading"
+                        ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Delisting…</>
+                        : "Remove Listing"}
+                    </Button>
                   )}
-                </Button>
-              )}
-
-              {!publicKey && buyStatus !== "done" && (
-                <p className="text-center text-xs text-muted-foreground mt-2">
-                  Connect your Phantom wallet to complete this purchase.
-                </p>
+                  <p className="text-center text-xs text-muted-foreground mt-2">This is your listing — you can remove it to reclaim your card.</p>
+                </>
+              ) : (
+                <>
+                  <Button
+                    size="lg"
+                    onClick={handleBuy}
+                    disabled={buyStatus === "loading"}
+                    className="w-full rounded-xl py-5 text-base font-600 relative overflow-hidden group"
+                    style={{ background: "linear-gradient(135deg, hsl(252 68% 68%), hsl(270 65% 60%))" }}
+                  >
+                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors" />
+                    {buyStatus === "loading" ? (
+                      <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Processing…</>
+                    ) : !publicKey ? (
+                      <><Wallet className="mr-2 h-5 w-5" />Connect Wallet to Buy</>
+                    ) : (
+                      <><Award className="mr-2 h-5 w-5" />Confirm Purchase</>
+                    )}
+                  </Button>
+                  {!publicKey && buyStatus !== "done" && (
+                    <p className="text-center text-xs text-muted-foreground mt-2">
+                      Connect your Phantom wallet to complete this purchase.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
