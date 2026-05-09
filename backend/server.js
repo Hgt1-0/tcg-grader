@@ -123,6 +123,104 @@ Return EXACTLY a JSON object with these keys:
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
+// ── POST /api/mint ────────────────────────────────────────────────────────────
+// Mints a graded card NFT via Crossmint and delivers to recipient email/wallet
+app.post(
+  "/api/mint",
+  upload.single("cardImage"),
+  async (req, res) => {
+    try {
+      const { email, cardName, grade, reason, centering, corners, edges, surface } = req.body;
+
+      if (!email || !cardName || !grade) {
+        return res.status(400).json({ error: "email, cardName and grade are required." });
+      }
+
+      // 1. Upload card image to ImgBB to get a public URL
+      let imageUrl = "https://images.pokemontcg.io/base1/4_hires.png"; // fallback
+      if (req.file) {
+        try {
+          const base64Image = req.file.buffer.toString("base64");
+          const imgbbRes = await fetch(
+            `https://api.imgbb.com/1/upload?key=387be6d219c4616e0a8d1b77f9d14f58`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: `image=${encodeURIComponent(base64Image)}&name=${encodeURIComponent(cardName)}`,
+            }
+          );
+          const imgbbData = await imgbbRes.json();
+          if (imgbbData?.data?.url) {
+            imageUrl = imgbbData.data.url;
+          }
+        } catch (imgErr) {
+          console.warn("ImgBB upload failed, using fallback image:", imgErr?.message);
+        }
+      }
+
+      // 2. Determine recipient format (email or wallet)
+      const isWallet = email.startsWith("solana:") || email.length === 44;
+      const recipient = isWallet ? email : `email:${email}:solana`;
+
+      // 3. Build NFT metadata
+      const gradeNum = parseFloat(grade.replace(/[^\d.]/g, "")) || 8;
+      const metadata = {
+        name: `${cardName} — ${grade}`,
+        description: `AI-graded trading card certified by CardProof. Grade: ${grade}. ${reason ?? ""}`,
+        image: imageUrl,
+        attributes: [
+          { trait_type: "Grade",      value: grade },
+          { trait_type: "Centering",  value: centering  ?? gradeNum.toFixed(1) },
+          { trait_type: "Corners",    value: corners    ?? gradeNum.toFixed(1) },
+          { trait_type: "Edges",      value: edges      ?? gradeNum.toFixed(1) },
+          { trait_type: "Surface",    value: surface    ?? gradeNum.toFixed(1) },
+          { trait_type: "Certified By", value: "CardProof AI" },
+          { trait_type: "Chain",      value: "Solana" },
+        ],
+      };
+
+      // 4. Call Crossmint minting API
+      const crossmintRes = await fetch(
+        `https://staging.crossmint.com/api/2022-06-09/collections/${process.env.CROSSMINT_COLLECTION_ID}/nfts`,
+        {
+          method: "POST",
+          headers: {
+            "x-api-key": process.env.CROSSMINT_API_KEY,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ recipient, metadata }),
+        }
+      );
+
+      const crossmintData = await crossmintRes.json();
+
+      if (!crossmintRes.ok) {
+        console.error("Crossmint error:", crossmintData);
+        return res.status(crossmintRes.status).json({
+          error: crossmintData?.message ?? "Crossmint minting failed.",
+          details: crossmintData,
+        });
+      }
+
+      console.log("Minted NFT:", crossmintData?.id, "→", recipient);
+      return res.json({
+        success: true,
+        nftId: crossmintData?.id,
+        mintHash: crossmintData?.onChain?.mintHash ?? null,
+        recipient,
+        imageUrl,
+        message: isWallet
+          ? "NFT minted to your wallet!"
+          : `NFT sent to ${email} — check your inbox!`,
+      });
+    } catch (error) {
+      console.error("Mint Error:", error?.message ?? error);
+      return res.status(500).json({ error: "Minting failed. Try again shortly." });
+    }
+  }
+);
+
+
 // ── Multer error handler ───────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
   if (err?.code === "LIMIT_FILE_SIZE") {

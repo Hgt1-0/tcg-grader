@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Award, ExternalLink, ChevronLeft, Sparkles, Info, Loader2, AlertCircle } from "lucide-react";
+import { Award, ExternalLink, ChevronLeft, Sparkles, Info, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import CardDisplay from "@/components/CardDisplay";
@@ -94,6 +94,12 @@ const Result: React.FC = () => {
   const [loading,   setLoading]   = useState(true);
   const [apiError,  setApiError]  = useState<string | null>(null);
 
+  // Mint state
+  const [mintEmail,  setMintEmail]  = useState("");
+  const [mintStatus, setMintStatus] = useState<"idle" | "loading" | "done">("idle");
+  const [mintResult, setMintResult] = useState<{ message: string; nftId?: string } | null>(null);
+  const [mintError,  setMintError]  = useState<string | null>(null);
+
   // Guard: if no files were passed, go back
   useEffect(() => {
     if (!state?.frontFile || !state?.backFile) {
@@ -136,6 +142,31 @@ const Result: React.FC = () => {
 
     gradeCard();
   }, [state]);
+
+  const handleMint = async () => {
+    if (!result || !mintEmail || !state?.frontFile) return;
+    setMintStatus("loading");
+    setMintError(null);
+    try {
+      const formData = new FormData();
+      const compressed = await compressImage(state.frontFile);
+      formData.append("cardImage", compressed);
+      formData.append("email",     mintEmail);
+      formData.append("cardName",  fileName);
+      formData.append("grade",     result.grade);
+      formData.append("reason",    result.reason ?? "");
+
+      const res = await fetch("/api/mint", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data?.error ?? "Minting failed.");
+      setMintResult({ message: data.message, nftId: data.nftId });
+      setMintStatus("done");
+    } catch (err: any) {
+      setMintError(err?.message ?? "Something went wrong. Try again.");
+      setMintStatus("idle");
+    }
+  };
 
   const previewUrl = state?.previewUrl ?? null;
   const fileName   = state?.fileName ?? "Trading Card";
@@ -286,28 +317,69 @@ const Result: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Actions */}
-                <div className="space-y-3 pt-1">
-                  <Button
-                    size="lg"
-                    className="w-full rounded-xl py-6 text-base font-600 relative overflow-hidden group"
-                    style={{ background: "linear-gradient(135deg, hsl(252 68% 68%), hsl(270 65% 60%))" }}
-                  >
-                    <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-300" />
-                    <Sparkles className="mr-2 h-5 w-5" />
-                    Mint as NFT on Solana
-                  </Button>
+                {/* Mint section */}
+                <div className="rounded-2xl border border-border bg-card/60 p-5 space-y-4 backdrop-blur-sm">
+                  <div>
+                    <h3 className="font-display text-sm font-700 text-foreground mb-1">Mint as NFT</h3>
+                    <p className="text-xs text-muted-foreground">Enter your email — we'll send the NFT directly to your inbox. No wallet needed.</p>
+                  </div>
 
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    onClick={() => navigate("/marketplace")}
-                    className="w-full rounded-xl py-6 text-base font-600 border-secondary/35 text-secondary hover:bg-secondary/8 hover:border-secondary/55 transition-all duration-300"
-                  >
-                    <ExternalLink className="mr-2 h-5 w-5" />
-                    View Marketplace
-                  </Button>
+                  {mintStatus === "done" && mintResult ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3 rounded-xl border border-secondary/30 bg-secondary/5 px-4 py-3">
+                        <CheckCircle2 className="h-5 w-5 text-secondary flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-600 text-secondary">NFT Minted! 🎉</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{mintResult.message}</p>
+                        </div>
+                      </div>
+                      {mintResult.nftId && (
+                        <p className="text-[0.65rem] text-muted-foreground font-mono text-center">
+                          NFT ID: {mintResult.nftId}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <input
+                        type="email"
+                        value={mintEmail}
+                        onChange={(e) => setMintEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        disabled={mintStatus === "loading"}
+                        className="w-full rounded-xl border border-border bg-background py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-colors disabled:opacity-50"
+                      />
+                      {mintError && (
+                        <p className="text-xs text-destructive flex items-center gap-1.5">
+                          <AlertCircle className="h-3.5 w-3.5" />{mintError}
+                        </p>
+                      )}
+                      <Button
+                        size="lg"
+                        onClick={handleMint}
+                        disabled={mintStatus === "loading" || !mintEmail.includes("@")}
+                        className="w-full rounded-xl py-6 text-base font-600 relative overflow-hidden group disabled:opacity-50"
+                        style={{ background: "linear-gradient(135deg, hsl(252 68% 68%), hsl(270 65% 60%))" }}
+                      >
+                        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-colors duration-300" />
+                        {mintStatus === "loading"
+                          ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Minting…</>
+                          : <><Sparkles className="mr-2 h-5 w-5" />Mint as NFT on Solana</>
+                        }
+                      </Button>
+                    </div>
+                  )}
                 </div>
+
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => navigate("/marketplace")}
+                  className="w-full rounded-xl py-6 text-base font-600 border-secondary/35 text-secondary hover:bg-secondary/8 hover:border-secondary/55 transition-all duration-300"
+                >
+                  <ExternalLink className="mr-2 h-5 w-5" />
+                  View Marketplace
+                </Button>
               </div>
             </div>
           )}
