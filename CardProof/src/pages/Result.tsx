@@ -39,6 +39,36 @@ function gradeToSubScores(n: number) {
   ];
 }
 
+// ── Image compression ─────────────────────────────────────────────────────────
+
+/** Resize + JPEG-compress a File using Canvas. Keeps aspect ratio, max 1024px wide. */
+async function compressImage(file: File, maxPx = 1024, quality = 0.85): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width  * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width  = w;
+      canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { reject(new Error("Canvas toBlob failed")); return; }
+          resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface LocationState {
@@ -80,8 +110,12 @@ const Result: React.FC = () => {
       setApiError(null);
       try {
         const formData = new FormData();
-        formData.append("frontImage", state.frontFile);
-        formData.append("backImage",  state.backFile);
+        const [compressedFront, compressedBack] = await Promise.all([
+          compressImage(state.frontFile),
+          compressImage(state.backFile),
+        ]);
+        formData.append("frontImage", compressedFront);
+        formData.append("backImage",  compressedBack);
 
         const res = await fetch("/api/grade", {
           method: "POST",

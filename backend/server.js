@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3001;
 // ── Multer — keep files in memory as buffers ──────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB per file
 });
 
 // ── Groq client (same API as OpenAI, different base URL) ─────────────────────
@@ -122,6 +122,21 @@ Return EXACTLY a JSON object with these keys:
 );
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
+// ── Multer error handler ───────────────────────────────────────────────────────
+app.use((err, req, res, _next) => {
+  if (err?.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({
+      grade: "PSA 8",
+      reason: "Image too large (max 25 MB). Try compressing your photo and re-uploading.",
+    });
+  }
+  console.error("Unhandled error:", err?.message ?? err);
+  return res.status(500).json({
+    grade: "PSA 8",
+    reason: "Server error — fallback grade applied.",
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`CardProof backend running on http://localhost:${PORT}`);
