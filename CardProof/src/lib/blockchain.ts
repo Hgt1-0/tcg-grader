@@ -1,48 +1,158 @@
 /**
- * blockchain.ts — Helpers for interacting with the tcg_marketplace program.
+ * blockchain.ts — Wrappers for the tcg_marketplace on-chain instructions.
  *
- * Currently only `initialize` exists on-chain.
- * When your friend adds mint/list/buy instructions, add the corresponding
- * functions here and import them into the pages.
+ * Instructions available:
+ *   list(price)  — escrows NFT, creates Listing PDA
+ *   buy()        — transfers SOL to seller + NFT to buyer, closes listing
+ *   delist()     — returns NFT to seller, closes listing
  */
 
-import { Program, web3 } from "@coral-xyz/anchor";
-import { SystemProgram } from "@solana/web3.js";
-import type { TcgMarketplace } from "./idl/types";
+import { Program, BN, web3 } from "@coral-xyz/anchor";
+import {
+  PublicKey,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
+  SYSVAR_RENT_PUBKEY,
+} from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import type { TcgMarketplace, Listing } from "./idl/types";
 import { PROGRAM_ID } from "./useProgram";
 
-// ─── Initialize ───────────────────────────────────────────────────────────────
+// ─── PDA ─────────────────────────────────────────────────────────────────────
+
+/** Listing PDA: seeds = ["listing", nftMint] */
+export function findListingPda(nftMint: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("listing"), nftMint.toBuffer()],
+    PROGRAM_ID
+  );
+}
+
+// ─── Instructions ─────────────────────────────────────────────────────────────
 
 /**
- * Calls the `initialize` instruction on the deployed program.
- * Returns the transaction signature.
+ * Lists an NFT on the marketplace.
+ * Escrows the NFT from seller's token account into the program-owned escrow.
+ *
+ * @param priceInSol  Price in SOL (converted to lamports internally)
  */
-export async function initialize(
-  program: Program<TcgMarketplace>
+export async function listNft(
+  program: Program<TcgMarketplace>,
+  seller: PublicKey,
+  nftMint: PublicKey,
+  sellerNftTokenAccount: PublicKey,
+  escrowNftTokenAccount: PublicKey,
+  priceInSol: number
 ): Promise<string> {
+  const [listing] = findListingPda(nftMint);
+  const price = new BN(Math.floor(priceInSol * LAMPORTS_PER_SOL));
+
   const sig = await (program.methods as any)
-    .initialize()
-    .accounts({})
+    .list(price)
+    .accounts({
+      seller,
+      nftMint,
+      sellerNftTokenAccount,
+      listing,
+      escrowNftTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: SYSVAR_RENT_PUBKEY,
+    })
     .rpc();
+
   return sig;
+}
+
+/**
+ * Buys a listed NFT.
+ * Transfers SOL from buyer → seller, NFT from escrow → buyer, closes listing.
+ */
+export async function buyNft(
+  program: Program<TcgMarketplace>,
+  buyer: PublicKey,
+  seller: PublicKey,
+  nftMint: PublicKey,
+  escrowNftTokenAccount: PublicKey,
+  buyerNftTokenAccount: PublicKey
+): Promise<string> {
+  const [listing] = findListingPda(nftMint);
+
+  const sig = await (program.methods as any)
+    .buy()
+    .accounts({
+      buyer,
+      seller,
+      listing,
+      escrowNftTokenAccount,
+      buyerNftTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+
+  return sig;
+}
+
+/**
+ * Removes a listing and returns the NFT to the seller.
+ */
+export async function delistNft(
+  program: Program<TcgMarketplace>,
+  seller: PublicKey,
+  nftMint: PublicKey,
+  escrowNftTokenAccount: PublicKey,
+  sellerNftTokenAccount: PublicKey
+): Promise<string> {
+  const [listing] = findListingPda(nftMint);
+
+  const sig = await (program.methods as any)
+    .delist()
+    .accounts({
+      seller,
+      listing,
+      escrowNftTokenAccount,
+      sellerNftTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+    })
+    .rpc();
+
+  return sig;
+}
+
+// ─── Account fetcher ──────────────────────────────────────────────────────────
+
+/**
+ * Fetches all active Listing accounts from the program.
+ * Returns raw on-chain data — map to UI format as needed.
+ */
+export async function fetchAllListings(
+  program: Program<TcgMarketplace>
+): Promise<Array<{ publicKey: PublicKey; account: Listing }>> {
+  return (program.account as any).listing.all();
+}
+
+/**
+ * Fetches a single Listing by its NFT mint address.
+ */
+export async function fetchListing(
+  program: Program<TcgMarketplace>,
+  nftMint: PublicKey
+): Promise<Listing | null> {
+  const [pda] = findListingPda(nftMint);
+  try {
+    return await (program.account as any).listing.fetch(pda);
+  } catch {
+    return null;
+  }
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
-/** Converts SOL → lamports. */
-export function solToLamports(sol: number): number {
-  return Math.floor(sol * web3.LAMPORTS_PER_SOL);
+export function solToLamports(sol: number): BN {
+  return new BN(Math.floor(sol * LAMPORTS_PER_SOL));
 }
 
-/** Converts lamports → SOL string (2dp). */
-export function lamportsToSol(lamports: number): string {
-  return (lamports / web3.LAMPORTS_PER_SOL).toFixed(2);
+export function lamportsToSol(lamports: BN): string {
+  return (lamports.toNumber() / LAMPORTS_PER_SOL).toFixed(2);
 }
-
-// ─── 🚧 Coming soon (pending friend's contract additions) ─────────────────────
-// mintGradeNft()  — stores AI grade on-chain as a verified record
-// listCard()      — lists a graded card on the marketplace
-// buyCard()       — transfers SOL buyer → seller and transfers ownership
-// delistCard()    — removes an active listing
-//
-// Add these here once the IDL is updated with those instructions.

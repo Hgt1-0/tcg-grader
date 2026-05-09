@@ -1,10 +1,6 @@
 /**
- * useProgram — Returns an initialised @coral-xyz/anchor Program instance
- * for the tcg_marketplace contract, bound to the connected wallet.
- *
- * Usage:
- *   const { program, provider } = useProgram();
- *   if (!program) return; // wallet not connected yet
+ * useProgram — Returns an initialised Anchor Program instance
+ * for the tcg_marketplace contract (list / buy / delist).
  */
 
 import { useMemo } from "react";
@@ -15,7 +11,7 @@ import IDL from "./idl/tcg_marketplace.json";
 import type { TcgMarketplace } from "./idl/types";
 
 export const PROGRAM_ID = new PublicKey(
-  "Gpq4aTWinuJqfKk7X3v5zuQ9USbSwG35d2Lh9SGMSYTt"
+  "9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W"
 );
 
 export function useProgram() {
@@ -43,10 +39,7 @@ export function useProgram() {
 
   const program = useMemo(() => {
     if (!provider) return null;
-    return new Program(
-      IDL as Idl,
-      provider
-    ) as unknown as Program<TcgMarketplace>;
+    return new Program(IDL as Idl, provider) as unknown as Program<TcgMarketplace>;
   }, [provider]);
 
   return { program, provider, connection, wallet };

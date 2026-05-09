@@ -1,120 +1,135 @@
-import React, { useState, useMemo } from "react";
-import { Search, SlidersHorizontal, TrendingUp, Zap } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { Search, SlidersHorizontal, TrendingUp, Zap, Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import MarketplaceCard from "@/components/MarketplaceCard";
+import { useProgram } from "@/lib/useProgram";
+import { fetchAllListings, lamportsToSol } from "@/lib/blockchain";
 
-const categories = ["All Cards", "Pokemon", "MTG", "Sports", "FIFA"];
+const categories = ["All Cards", "Base Set", "Fossil", "Neo Genesis", "Promo"];
 
-const listings = [
+// ── Pokemon card demo listings ────────────────────────────────────────────────
+const demoListings = [
   {
-    name: "Charizard Holo 1st Edition",
+    name: "Charizard Holo",
     grade: "PSA 9",
-    price: "12.5",
-    category: "Pokemon",
+    price: "120.0",
+    category: "Base Set",
     imageUrl: "https://images.pokemontcg.io/base1/4_hires.png",
     seller: "7xKp...3Fqr",
     mintedAt: "2025-03-18",
   },
   {
-    name: "Black Lotus Alpha",
-    grade: "PSA 7",
-    price: "85.0",
-    category: "MTG",
-    imageUrl: "/cards/black_lotus.png",
-    seller: "3mRt...9Ykz",
-    mintedAt: "2025-04-02",
-  },
-  {
-    name: "Pikachu Illustrator",
-    grade: "PSA 10",
-    price: "150.0",
-    category: "Pokemon",
-    imageUrl: "https://images.pokemontcg.io/basep/1_hires.png",
-    seller: "9nWq...2Lpx",
-    mintedAt: "2025-02-27",
-  },
-  {
-    name: "Michael Jordan Rookie",
+    name: "Blastoise Holo",
     grade: "PSA 8",
-    price: "24.3",
-    category: "Sports",
-    imageUrl: "https://storage.googleapis.com/images.pricecharting.com/corr5lxsleonni2ajjxn/1600.jpg",
-    seller: "5vBj...8Dmn",
-    mintedAt: "2025-04-15",
-  },
-  {
-    name: "Blastoise Shadowless",
-    grade: "PSA 8",
-    price: "8.7",
-    category: "Pokemon",
+    price: "45.0",
+    category: "Base Set",
     imageUrl: "https://images.pokemontcg.io/base1/2_hires.png",
     seller: "1cAh...6Srv",
     mintedAt: "2025-03-30",
   },
   {
-    name: "Mox Sapphire Beta",
-    grade: "PSA 6",
-    price: "45.0",
-    category: "MTG",
-    imageUrl: "/cards/mox_sapphire.png",
+    name: "Venusaur Holo",
+    grade: "PSA 7",
+    price: "32.0",
+    category: "Base Set",
+    imageUrl: "https://images.pokemontcg.io/base1/15_hires.png",
     seller: "4pGs...7Tnv",
     mintedAt: "2025-04-08",
   },
   {
-    name: "LeBron James Rookie",
+    name: "Mewtwo Holo",
+    grade: "PSA 9",
+    price: "55.0",
+    category: "Base Set",
+    imageUrl: "https://images.pokemontcg.io/base1/10_hires.png",
+    seller: "9nWq...2Lpx",
+    mintedAt: "2025-02-27",
+  },
+  {
+    name: "Raichu Holo",
+    grade: "PSA 8",
+    price: "28.0",
+    category: "Base Set",
+    imageUrl: "https://images.pokemontcg.io/base1/14_hires.png",
+    seller: "3mRt...9Ykz",
+    mintedAt: "2025-04-02",
+  },
+  {
+    name: "Gyarados Holo",
+    grade: "PSA 8",
+    price: "22.5",
+    category: "Base Set",
+    imageUrl: "https://images.pokemontcg.io/base1/6_hires.png",
+    seller: "5vBj...8Dmn",
+    mintedAt: "2025-04-15",
+  },
+  {
+    name: "Gengar Holo",
     grade: "PSA 9",
     price: "38.0",
-    category: "Sports",
-    imageUrl: "/cards/lebron.png",
+    category: "Fossil",
+    imageUrl: "https://images.pokemontcg.io/fossil/5_hires.png",
     seller: "3xAb...7Hcq",
     mintedAt: "2025-03-10",
   },
   {
-    name: "Kobe Bryant #24",
-    grade: "PSA 10",
-    price: "55.0",
-    category: "Sports",
-    imageUrl: "/cards/kobe.png",
+    name: "Lapras Holo",
+    grade: "PSA 8",
+    price: "18.0",
+    category: "Fossil",
+    imageUrl: "https://images.pokemontcg.io/fossil/10_hires.png",
     seller: "7yPn...2Wks",
     mintedAt: "2025-02-14",
   },
   {
-    name: "Stephen Curry Splash",
-    grade: "PSA 8",
-    price: "19.5",
-    category: "Sports",
-    imageUrl: "/cards/curry.png",
+    name: "Dragonite Holo",
+    grade: "PSA 7",
+    price: "24.0",
+    category: "Fossil",
+    imageUrl: "https://images.pokemontcg.io/fossil/4_hires.png",
     seller: "5mZr...9Flj",
     mintedAt: "2025-04-19",
   },
   {
-    name: "Cristiano Ronaldo CR7",
+    name: "Lugia Holo",
     grade: "PSA 10",
-    price: "32.0",
-    category: "FIFA",
-    imageUrl: "/cards/ronaldo.png",
+    price: "200.0",
+    category: "Neo Genesis",
+    imageUrl: "https://images.pokemontcg.io/neo1/9_hires.png",
     seller: "2rCd...5Wzp",
     mintedAt: "2025-05-01",
   },
   {
-    name: "Kylian Mbappe Gold",
+    name: "Typhlosion Holo",
     grade: "PSA 9",
-    price: "18.5",
-    category: "FIFA",
-    imageUrl: "/cards/mbappe.png",
+    price: "42.0",
+    category: "Neo Genesis",
+    imageUrl: "https://images.pokemontcg.io/neo1/18_hires.png",
     seller: "6kFm...1Jqt",
     mintedAt: "2025-04-22",
   },
   {
-    name: "Lionel Messi GOAT Edition",
-    grade: "PSA 9",
-    price: "27.0",
-    category: "FIFA",
-    imageUrl: "/cards/messi.png",
+    name: "Pikachu Illustrator",
+    grade: "PSA 10",
+    price: "500.0",
+    category: "Promo",
+    imageUrl: "https://images.pokemontcg.io/basep/1_hires.png",
     seller: "8aLs...4Vbn",
     mintedAt: "2025-04-28",
   },
 ];
+
+type ListingItem = {
+  name: string;
+  grade: string;
+  price: string;
+  category: string;
+  imageUrl?: string;
+  seller?: string;
+  mintedAt?: string;
+  nftMint?: string;
+  onChain?: boolean;
+};
 
 const sortOptions = ["Recent", "Price: Low", "Price: High", "Grade"];
 
@@ -122,11 +137,41 @@ const Marketplace: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState("All Cards");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("Recent");
+  const [chainListings, setChainListings] = useState<ListingItem[]>([]);
+  const [loadingChain, setLoadingChain] = useState(false);
+
+  const { program } = useProgram();
+
+  // ── Fetch on-chain listings when program is ready ─────────────────────────
+  useEffect(() => {
+    if (!program) return;
+    setLoadingChain(true);
+    fetchAllListings(program)
+      .then((raw) => {
+        const mapped: ListingItem[] = raw.map((l) => ({
+          name: `Card #${l.publicKey.toBase58().slice(0, 6)}`,
+          grade: "On-Chain",
+          price: lamportsToSol(l.account.price),
+          category: "Base Set",
+          seller: l.account.seller.toBase58().slice(0, 6) + "..." + l.account.seller.toBase58().slice(-4),
+          mintedAt: new Date().toISOString().slice(0, 10),
+          nftMint: l.account.mint.toBase58(),
+          onChain: true,
+        }));
+        setChainListings(mapped);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingChain(false));
+  }, [program]);
+
+  const allListings = useMemo((): ListingItem[] => {
+    return [...demoListings, ...chainListings];
+  }, [chainListings]);
 
   const filteredListings = useMemo(() => {
     let results = activeFilter === "All Cards"
-      ? listings
-      : listings.filter((l) => l.category === activeFilter);
+      ? allListings
+      : allListings.filter((l) => l.category === activeFilter);
 
     if (searchQuery.trim()) {
       results = results.filter(l =>
@@ -134,22 +179,21 @@ const Marketplace: React.FC = () => {
       );
     }
 
-    if (sortBy === "Price: Low") results = [...results].sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+    if (sortBy === "Price: Low")  results = [...results].sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
     if (sortBy === "Price: High") results = [...results].sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
     if (sortBy === "Grade") results = [...results].sort((a, b) => {
-      const ga = parseInt(a.grade.replace(/\D/g, ""));
-      const gb = parseInt(b.grade.replace(/\D/g, ""));
+      const ga = parseInt(a.grade.replace(/\D/g, "")) || 0;
+      const gb = parseInt(b.grade.replace(/\D/g, "")) || 0;
       return gb - ga;
     });
 
     return results;
-  }, [activeFilter, searchQuery, sortBy]);
+  }, [activeFilter, searchQuery, sortBy, allListings]);
 
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden">
       <Navbar />
 
-      {/* Background ambient */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 right-1/4 h-[500px] w-[600px] rounded-full bg-secondary/3 blur-[120px]" />
         <div className="absolute bottom-0 left-1/4 h-[400px] w-[500px] rounded-full bg-primary/3 blur-[100px]" />
@@ -168,17 +212,19 @@ const Marketplace: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
               <div>
                 <h1 className="font-display text-3xl sm:text-4xl font-700 text-foreground">Marketplace</h1>
-                <p className="mt-1.5 text-sm text-muted-foreground">Discover AI-verified trading card NFTs</p>
+                <p className="mt-1.5 text-sm text-muted-foreground">AI-verified Pokémon card NFTs on Solana</p>
               </div>
-              {/* Quick stats */}
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5 text-secondary" />
-                  <span>{listings.length} listings</span>
+                  <span>{filteredListings.length} listings</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Zap className="h-3.5 w-3.5 text-primary" />
-                  <span>Live floor: 8.7 SOL</span>
+                  {loadingChain
+                    ? <span className="flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" />syncing chain…</span>
+                    : <span>{chainListings.length > 0 ? `${chainListings.length} on-chain` : "Floor: 18.0 SOL"}</span>
+                  }
                 </div>
               </div>
             </div>
@@ -187,7 +233,6 @@ const Marketplace: React.FC = () => {
           {/* Filters + Search */}
           <div className="mb-8 fade-in-up fade-in-up-delay-1">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              {/* Category pills */}
               <div className="flex items-center gap-2 flex-wrap">
                 {categories.map((cat) => (
                   <button
@@ -207,21 +252,18 @@ const Marketplace: React.FC = () => {
                 ))}
               </div>
 
-              {/* Right controls */}
               <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto">
-                {/* Search */}
                 <div className="relative flex-1 sm:flex-none">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search cards..."
+                    placeholder="Search Pokémon cards..."
                     className="w-full sm:w-56 rounded-xl border border-border bg-card py-2.5 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-colors"
                   />
                 </div>
 
-                {/* Sort */}
                 <div className="relative">
                   <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                   <select
@@ -238,7 +280,7 @@ const Marketplace: React.FC = () => {
 
           {/* Grid */}
           {filteredListings.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {filteredListings.map((card, index) => (
                 <MarketplaceCard
                   key={`${card.name}-${index}`}
@@ -249,6 +291,8 @@ const Marketplace: React.FC = () => {
                   imageUrl={card.imageUrl}
                   seller={card.seller}
                   mintedAt={card.mintedAt}
+                  nftMint={card.nftMint}
+                  onChain={card.onChain}
                   index={index}
                 />
               ))}

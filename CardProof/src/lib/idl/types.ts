@@ -1,46 +1,38 @@
 /**
- * Program IDL in camelCase format in order to be used in JS/TS.
- *
- * Note that this is only a type helper and is not the actual IDL. The original
- * IDL can be found at `target/idl/tcg_marketplace.json`.
+ * TypeScript types for the tcg_marketplace Anchor program.
+ * Program ID: 9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W
+ * Generated from: blockchain/programs/tcg_marketplace/src/lib.rs
  */
+
+import { PublicKey } from "@solana/web3.js";
+import BN from "bn.js";
+
+// ─── On-chain account ─────────────────────────────────────────────────────────
+
+/** PDA: seeds = ["listing", nft_mint] — created when seller lists a card */
+export interface Listing {
+  seller: PublicKey;
+  mint:   PublicKey;
+  price:  BN;       // lamports
+  bump:   number;
+}
+
+// ─── Anchor program type ──────────────────────────────────────────────────────
+
 export type TcgMarketplace = {
-  "address": "Gpq4aTWinuJqfKk7X3v5zuQ9USbSwG35d2Lh9SGMSYTt",
-  "metadata": {
-    "name": "tcgMarketplace",
-    "version": "0.1.0",
-    "spec": "0.1.0",
-    "description": "Created with Anchor"
-  },
-  "instructions": [
+  address: "9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W";
+  metadata: {
+    name: "tcg_marketplace";
+    version: "0.1.0";
+    spec: "0.1.0";
+  };
+  accounts: [{ name: "listing"; type: Listing }];
+  instructions: [
     {
-      "name": "initialize",
-      "discriminator": [
-        175,
-        175,
-        109,
-        31,
-        13,
-        152,
-        155,
-        237
-      ],
-      "accounts": [],
-      "args": []
-    }
-  ],
-  "errors": [
-    {
-      "code": 6000,
-      "name": "customError",
-      "msg": "Custom error message"
-    }
-  ],
-  "constants": [
-    {
-      "name": "seed",
-      "type": "string",
-      "value": "\"anchor\""
-    }
-  ]
+      name: "list";
+      args: [{ name: "price"; type: "u64" }];
+    },
+    { name: "buy";    args: [] },
+    { name: "delist"; args: [] }
+  ];
 };
