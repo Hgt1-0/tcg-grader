@@ -52,7 +52,7 @@ const Result: React.FC = () => {
       <div className="relative pt-24 pb-20 px-5 sm:px-8">
         <div className="mx-auto max-w-6xl">
 
-          {/* Back button + breadcrumb */}
+          {/* Back button */}
           <button
             onClick={() => navigate("/")}
             className="mb-8 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group fade-in-up"
@@ -111,7 +111,7 @@ const Result: React.FC = () => {
                       animation: "badge-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both"
                     }}
                   >
-                    <Award className="h-8 w-8 text-gold flex-shrink-0" style={{ color: "hsl(var(--gold))" }} />
+                    <Award className="h-8 w-8 flex-shrink-0" style={{ color: "hsl(var(--gold))" }} />
                     <div>
                       <p className="text-[0.65rem] font-600 text-muted-foreground uppercase tracking-widest mb-0.5">PSA Grade</p>
                       <p className="font-display text-3xl font-800 text-gradient-gold leading-none">PSA 8</p>
@@ -152,6 +152,7 @@ const Result: React.FC = () => {
 
               {/* Actions */}
               <div className="space-y-3 pt-1">
+                {/* 🚧 Mint — wired up once friend adds mintGradeNft instruction to the contract */}
                 <Button
                   size="lg"
                   className="w-full rounded-xl py-6 text-base font-600 relative overflow-hidden group"
@@ -162,6 +163,7 @@ const Result: React.FC = () => {
                   Mint as NFT on Solana
                 </Button>
 
+                {/* 🚧 List — wired up once listCard instruction exists */}
                 <Button
                   size="lg"
                   variant="outline"

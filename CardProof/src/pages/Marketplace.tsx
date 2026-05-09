@@ -3,15 +3,90 @@ import { Search, SlidersHorizontal, TrendingUp, Zap } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import MarketplaceCard from "@/components/MarketplaceCard";
 
-const categories = ["All Cards", "Pokemon", "MTG", "Sports"];
+const categories = ["All Cards", "Pokemon", "MTG", "Sports", "FIFA"];
 
 const listings = [
-  { name: "Charizard Holo 1st Edition", grade: "PSA 9", price: "12.5", category: "Pokemon" },
-  { name: "Black Lotus Alpha", grade: "PSA 7", price: "85.0", category: "MTG" },
-  { name: "Pikachu Illustrator", grade: "PSA 10", price: "150.0", category: "Pokemon" },
-  { name: "Michael Jordan Rookie", grade: "PSA 8", price: "24.3", category: "Sports" },
-  { name: "Blastoise Shadowless", grade: "PSA 8", price: "8.7", category: "Pokemon" },
-  { name: "Mox Sapphire Beta", grade: "PSA 6", price: "45.0", category: "MTG" },
+  {
+    name: "Charizard Holo 1st Edition",
+    grade: "PSA 9",
+    price: "12.5",
+    category: "Pokemon",
+    imageUrl: "https://images.pokemontcg.io/base1/4_hires.png",
+    seller: "7xKp...3Fqr",
+    mintedAt: "2025-03-18",
+  },
+  {
+    name: "Black Lotus Alpha",
+    grade: "PSA 7",
+    price: "85.0",
+    category: "MTG",
+    imageUrl: "https://cards.scryfall.io/large/front/b/d/bd8fa327-dd41-4737-8f19-2cf5eb1f7cdd.jpg",
+    seller: "3mRt...9Ykz",
+    mintedAt: "2025-04-02",
+  },
+  {
+    name: "Pikachu Illustrator",
+    grade: "PSA 10",
+    price: "150.0",
+    category: "Pokemon",
+    imageUrl: "https://images.pokemontcg.io/basep/1_hires.png",
+    seller: "9nWq...2Lpx",
+    mintedAt: "2025-02-27",
+  },
+  {
+    name: "Michael Jordan Rookie",
+    grade: "PSA 8",
+    price: "24.3",
+    category: "Sports",
+    imageUrl: "https://storage.googleapis.com/images.pricecharting.com/corr5lxsleonni2ajjxn/1600.jpg",
+    seller: "5vBj...8Dmn",
+    mintedAt: "2025-04-15",
+  },
+  {
+    name: "Blastoise Shadowless",
+    grade: "PSA 8",
+    price: "8.7",
+    category: "Pokemon",
+    imageUrl: "https://images.pokemontcg.io/base1/2_hires.png",
+    seller: "1cAh...6Srv",
+    mintedAt: "2025-03-30",
+  },
+  {
+    name: "Mox Sapphire Beta",
+    grade: "PSA 6",
+    price: "45.0",
+    category: "MTG",
+    imageUrl: "https://cards.scryfall.io/large/front/d/9/d9a7a58f-cc7e-4d41-8d83-8e9099d2beea.jpg",
+    seller: "4pGs...7Tnv",
+    mintedAt: "2025-04-08",
+  },
+  {
+    name: "Cristiano Ronaldo CR7",
+    grade: "PSA 10",
+    price: "32.0",
+    category: "FIFA",
+    imageUrl: "/cards/ronaldo.png",
+    seller: "2rCd...5Wzp",
+    mintedAt: "2025-05-01",
+  },
+  {
+    name: "Kylian Mbappe Gold",
+    grade: "PSA 9",
+    price: "18.5",
+    category: "FIFA",
+    imageUrl: "/cards/mbappe.png",
+    seller: "6kFm...1Jqt",
+    mintedAt: "2025-04-22",
+  },
+  {
+    name: "Lionel Messi GOAT Edition",
+    grade: "PSA 9",
+    price: "27.0",
+    category: "FIFA",
+    imageUrl: "/cards/messi.png",
+    seller: "8aLs...4Vbn",
+    mintedAt: "2025-04-28",
+  },
 ];
 
 const sortOptions = ["Recent", "Price: Low", "Price: High", "Grade"];
@@ -144,6 +219,9 @@ const Marketplace: React.FC = () => {
                   grade={card.grade}
                   price={card.price}
                   category={card.category}
+                  imageUrl={card.imageUrl}
+                  seller={card.seller}
+                  mintedAt={card.mintedAt}
                   index={index}
                 />
               ))}
