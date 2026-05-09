@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Search, SlidersHorizontal, TrendingUp, Zap, Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import MarketplaceCard from "@/components/MarketplaceCard";
 import ListCardModal from "@/components/ListCardModal";
@@ -142,8 +143,19 @@ const Marketplace: React.FC = () => {
   const [chainListings, setChainListings] = useState<ListingItem[]>([]);
   const [loadingChain, setLoadingChain] = useState(false);
   const [listModalOpen, setListModalOpen] = useState(false);
+  const [prefillMint, setPrefillMint] = useState("");
 
+  const location = useLocation();
   const { program } = useProgram();
+
+  // Auto-open List modal if navigated here from mint result
+  useEffect(() => {
+    const routeState = location.state as { prefillMint?: string } | null;
+    if (routeState?.prefillMint) {
+      setPrefillMint(routeState.prefillMint);
+      setListModalOpen(true);
+    }
+  }, [location.state]);
 
   // ── Fetch on-chain listings ──────────────────────────────────────────────
   const refreshChain = useCallback(() => {
@@ -327,6 +339,7 @@ const Marketplace: React.FC = () => {
         open={listModalOpen}
         onOpenChange={setListModalOpen}
         onListed={refreshChain}
+        prefillMint={prefillMint}
       />
     </div>
   );

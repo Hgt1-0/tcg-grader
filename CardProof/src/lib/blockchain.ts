@@ -51,7 +51,8 @@ export async function listNft(
   // Fresh keypair for the escrow token account (initialized by the program)
   const escrowKeypair = web3.Keypair.generate();
 
-  const sig = await (program.methods as any)
+  // Build raw transaction (do NOT use .rpc() — wallet adapter can drop co-signers)
+  const tx = await (program.methods as any)
     .list(price)
     .accounts({
       seller,
@@ -63,8 +64,22 @@ export async function listNft(
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY,
     })
-    .signers([escrowKeypair])
-    .rpc();
+    .transaction();
+
+  // Attach blockhash + fee payer before partial sign
+  const conn = program.provider.connection;
+  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = seller;
+
+  // Escrow keypair must sign first (it's paying rent for its own account init)
+  tx.partialSign(escrowKeypair);
+
+  // Wallet adapter signs + submits
+  const sig = await (program.provider as any).sendAndConfirm(tx, [escrowKeypair], {
+    commitment: "confirmed",
+    maxRetries: 3,
+  });
 
   return { sig, escrowPubkey: escrowKeypair.publicKey.toBase58() };
 }

@@ -162,10 +162,17 @@ app.post(
       const isWallet = email.startsWith("solana:") || email.length === 44;
       const recipient = isWallet ? email : `email:${email}:solana`;
 
-      // 3. Build NFT metadata
+      // 3. Build NFT metadata (Solana name field max 32 bytes UTF-8)
+      const truncateTo32Bytes = (str) => {
+        const buf = Buffer.from(str, "utf8");
+        if (buf.length <= 32) return str;
+        return buf.slice(0, 32).toString("utf8").replace(/\uFFFD/g, "").trim();
+      };
+
       const gradeNum = parseFloat(grade.replace(/[^\d.]/g, "")) || 8;
+      const rawName  = `${cardName} — ${grade}`;
       const metadata = {
-        name: `${cardName} — ${grade}`,
+        name: truncateTo32Bytes(rawName),
         description: `AI-graded trading card certified by CardProof. Grade: ${grade}. ${reason ?? ""}`,
         image: imageUrl,
         attributes: [
@@ -221,7 +228,26 @@ app.post(
 );
 
 
-// ── Multer error handler ───────────────────────────────────────────────────────
+// ── GET /api/mint/:nftId — poll for on-chain mint address ─────────────────────
+app.get("/api/mint/:nftId", async (req, res) => {
+  try {
+    const { nftId } = req.params;
+    const r = await fetch(
+      `https://staging.crossmint.com/api/2022-06-09/collections/${process.env.CROSSMINT_COLLECTION_ID}/nfts/${nftId}`,
+      { headers: { "x-api-key": process.env.CROSSMINT_API_KEY } }
+    );
+    const data = await r.json();
+    return res.json({
+      status:    data?.onChain?.status ?? "pending",
+      mintHash:  data?.onChain?.mintHash ?? null,
+      chain:     data?.onChain?.chain ?? "solana",
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err?.message });
+  }
+});
+
+
 app.use((err, req, res, _next) => {
   if (err?.code === "LIMIT_FILE_SIZE") {
     return res.status(413).json({

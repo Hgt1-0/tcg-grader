@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import CardDisplay from "@/components/CardDisplay";
 import GradeBar from "@/components/GradeBar";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 // ── PSA grade helpers ─────────────────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ const Result: React.FC = () => {
   const navigate   = useNavigate();
   const location   = useLocation();
   const state      = location.state as LocationState | null;
+  const { publicKey } = useWallet();
 
   const [result,    setResult]    = useState<GradeResult | null>(null);
   const [loading,   setLoading]   = useState(true);
@@ -97,7 +99,7 @@ const Result: React.FC = () => {
   // Mint state
   const [mintEmail,  setMintEmail]  = useState("");
   const [mintStatus, setMintStatus] = useState<"idle" | "loading" | "done">("idle");
-  const [mintResult, setMintResult] = useState<{ message: string; nftId?: string } | null>(null);
+  const [mintResult, setMintResult] = useState<{ message: string; nftId?: string; mintAddress?: string } | null>(null);
   const [mintError,  setMintError]  = useState<string | null>(null);
 
   // Guard: if no files were passed, go back
@@ -144,23 +146,46 @@ const Result: React.FC = () => {
   }, [state]);
 
   const handleMint = async () => {
-    if (!result || !mintEmail || !state?.frontFile) return;
+    if (!result || !state?.frontFile) return;
+    const recipient = publicKey ? `solana:${publicKey.toBase58()}` : mintEmail;
+    if (!recipient || (!publicKey && !mintEmail.includes("@"))) return;
+
     setMintStatus("loading");
     setMintError(null);
     try {
+      // 1. Submit mint request
       const formData = new FormData();
       const compressed = await compressImage(state.frontFile);
       formData.append("cardImage", compressed);
-      formData.append("email",     mintEmail);
+      formData.append("email",     recipient);
       formData.append("cardName",  fileName);
       formData.append("grade",     result.grade);
       formData.append("reason",    result.reason ?? "");
 
       const res = await fetch("/api/mint", { method: "POST", body: formData });
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error ?? "Minting failed.");
-      setMintResult({ message: data.message, nftId: data.nftId });
+
+      const nftId = data.nftId;
+
+      // 2. Poll for on-chain confirmation (max 90s)
+      let mintAddress: string | null = null;
+      if (nftId && publicKey) {
+        for (let i = 0; i < 18; i++) {
+          await new Promise(r => setTimeout(r, 5000));
+          const poll = await fetch(`/api/mint/${nftId}`).then(r => r.json());
+          if (poll.status === "success" && poll.mintHash) {
+            mintAddress = poll.mintHash;
+            break;
+          }
+        }
+      }
+
+      setMintResult({
+        message:     data.message,
+        nftId,
+        mintAddress: mintAddress ?? undefined,
+      });
       setMintStatus("done");
     } catch (err: any) {
       setMintError(err?.message ?? "Something went wrong. Try again.");
@@ -321,7 +346,11 @@ const Result: React.FC = () => {
                 <div className="rounded-2xl border border-border bg-card/60 p-5 space-y-4 backdrop-blur-sm">
                   <div>
                     <h3 className="font-display text-sm font-700 text-foreground mb-1">Mint as NFT</h3>
-                    <p className="text-xs text-muted-foreground">Enter your email — we'll send the NFT directly to your inbox. No wallet needed.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {publicKey
+                        ? "Mint directly to your connected wallet — then list it instantly."
+                        : "Enter an email to receive the NFT, or connect Phantom to mint to your wallet."}
+                    </p>
                   </div>
 
                   {mintStatus === "done" && mintResult ? (
@@ -333,22 +362,52 @@ const Result: React.FC = () => {
                           <p className="text-xs text-muted-foreground mt-0.5">{mintResult.message}</p>
                         </div>
                       </div>
-                      {mintResult.nftId && (
-                        <p className="text-[0.65rem] text-muted-foreground font-mono text-center">
-                          NFT ID: {mintResult.nftId}
-                        </p>
+
+                      {mintResult.mintAddress ? (
+                        <>
+                          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                            <p className="text-[0.65rem] text-muted-foreground uppercase tracking-wide mb-1">✅ Confirmed Mint Address</p>
+                            <p className="text-xs text-foreground font-mono break-all">{mintResult.mintAddress}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => navigate("/marketplace", { state: { prefillMint: mintResult.mintAddress } })}
+                            className="w-full rounded-xl py-3 text-sm font-600 relative overflow-hidden group"
+                            style={{ background: "linear-gradient(135deg, hsl(163 72% 40%), hsl(180 70% 35%))" }}
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            List on Marketplace Now
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="rounded-xl border border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                          {publicKey
+                            ? "⏳ Waiting for on-chain confirmation… (up to 90s). Copy your NFT ID above to check manually."
+                            : "NFT delivered to your email — check your inbox to view it."}
+                          {mintResult.nftId && (
+                            <p className="font-mono mt-1 break-all opacity-60">ID: {mintResult.nftId}</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <input
-                        type="email"
-                        value={mintEmail}
-                        onChange={(e) => setMintEmail(e.target.value)}
-                        placeholder="your@email.com"
-                        disabled={mintStatus === "loading"}
-                        className="w-full rounded-xl border border-border bg-background py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-colors disabled:opacity-50"
-                      />
+                      {/* Wallet mode */}
+                      {publicKey ? (
+                        <div className="flex items-center gap-3 rounded-xl border border-secondary/20 bg-secondary/5 px-4 py-2.5">
+                          <div className="h-2 w-2 rounded-full bg-secondary animate-pulse flex-shrink-0" />
+                          <p className="text-xs text-secondary font-mono truncate">{publicKey.toBase58()}</p>
+                        </div>
+                      ) : (
+                        <input
+                          type="email"
+                          value={mintEmail}
+                          onChange={(e) => setMintEmail(e.target.value)}
+                          placeholder="your@email.com (no wallet needed)"
+                          disabled={mintStatus === "loading"}
+                          className="w-full rounded-xl border border-border bg-background py-2.5 px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20 transition-colors disabled:opacity-50"
+                        />
+                      )}
                       {mintError && (
                         <p className="text-xs text-destructive flex items-center gap-1.5">
                           <AlertCircle className="h-3.5 w-3.5" />{mintError}
@@ -357,7 +416,7 @@ const Result: React.FC = () => {
                       <Button
                         size="lg"
                         onClick={handleMint}
-                        disabled={mintStatus === "loading" || !mintEmail.includes("@")}
+                        disabled={mintStatus === "loading" || (!publicKey && !mintEmail.includes("@"))}
                         className="w-full rounded-xl py-6 text-base font-600 relative overflow-hidden group disabled:opacity-50"
                         style={{ background: "linear-gradient(135deg, hsl(252 68% 68%), hsl(270 65% 60%))" }}
                       >

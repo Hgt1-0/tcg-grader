@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,11 +17,12 @@ import { useToast } from "@/hooks/use-toast";
 interface ListCardModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onListed?: () => void; // callback to refresh listings
+  onListed?: () => void;
+  prefillMint?: string; // auto-filled from mint result page
 }
 
-const ListCardModal: React.FC<ListCardModalProps> = ({ open, onOpenChange, onListed }) => {
-  const [mintAddress, setMintAddress] = useState("");
+const ListCardModal: React.FC<ListCardModalProps> = ({ open, onOpenChange, onListed, prefillMint }) => {
+  const [mintAddress, setMintAddress] = useState(prefillMint ?? "");
   const [priceSOL, setPriceSOL] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
 
@@ -85,6 +86,11 @@ const ListCardModal: React.FC<ListCardModalProps> = ({ open, onOpenChange, onLis
       toast({ title: "Listing failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     }
   };
+
+  // Sync prefillMint when it changes (e.g. modal opens with a new address)
+  useEffect(() => {
+    if (prefillMint) setMintAddress(prefillMint);
+  }, [prefillMint, open]);
 
   const handleClose = (v: boolean) => {
     if (!v) { setStatus("idle"); setMintAddress(""); setPriceSOL(""); }
