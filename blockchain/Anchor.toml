@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-tcg_marketplace = "Gpq4aTWinuJqfKk7X3v5zuQ9USbSwG35d2Lh9SGMSYTt"
+tcg_marketplace = "9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W"
 
 [programs.devnet]
-tcg_marketplace = "Gpq4aTWinuJqfKk7X3v5zuQ9USbSwG35d2Lh9SGMSYTt"
+tcg_marketplace = "9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W"
 
 [provider]
 cluster = "Devnet"
