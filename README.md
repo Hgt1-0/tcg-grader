@@ -10,13 +10,15 @@ CardProof is a full-stack demo for **AI-assisted trading card grading** and **So
 
 The repository is organized into three parts:
 
-| Package | Role |
-|--------|------|
-| **`CardProof/`** | React single-page app: upload flow, results, wallet connection (Phantom on **Solana Devnet**), optional Crossmint minting, and a marketplace UI backed by an Anchor program. |
-| **`backend/`** | Express API: accepts card images, calls **Groq**’s OpenAI-compatible vision API for grading, and integrates **Crossmint** (staging) for email/wallet NFT delivery. |
-| **`blockchain/`** | **Anchor** program `tcg_marketplace`: escrow listings, purchases with SOL, and delisting for SPL NFTs. |
 
-In local development, the Vite dev server proxies `/api/*` to the backend so the browser can call grading and mint endpoints without CORS friction.
+| Package           | Role                                                                                                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `**CardProof/`**  | React single-page app: upload flow, results, wallet connection (Phantom on **Solana Devnet**), optional Crossmint minting, and a marketplace UI backed by an Anchor program. |
+| `**backend/`**    | Express API: accepts card images, calls **Groq**’s OpenAI-compatible vision API for grading, and integrates **Crossmint** (staging) for email/wallet NFT delivery.           |
+| `**blockchain/`** | **Anchor** program `tcg_marketplace`: escrow listings, purchases with SOL, and delisting for SPL NFTs.                                                                       |
+
+
+In local development, the Vite dev server proxies `/api/`* to the backend so the browser can call grading and mint endpoints without CORS friction.
 
 ---
 
@@ -88,12 +90,14 @@ npm install
 
 Backend environment variables are documented in `backend/.env.example`. Summary:
 
-| Variable | Purpose |
-|----------|---------|
-| `GROQ_API_KEY` | Authenticates requests to Groq for vision-based grading |
-| `CROSSMINT_API_KEY` | Crossmint staging API key for `/api/mint` |
-| `CROSSMINT_COLLECTION_ID` | Target collection for minted NFTs |
-| `PORT` | HTTP port (default **3001**) |
+
+| Variable                  | Purpose                                                 |
+| ------------------------- | ------------------------------------------------------- |
+| `GROQ_API_KEY`            | Authenticates requests to Groq for vision-based grading |
+| `CROSSMINT_API_KEY`       | Crossmint staging API key for `/api/mint`               |
+| `CROSSMINT_COLLECTION_ID` | Target collection for minted NFTs                       |
+| `PORT`                    | HTTP port (default **3001**)                            |
+
 
 Copy `backend/.env.example` to `backend/.env` and fill in real values before running the API.
 
@@ -131,7 +135,7 @@ cd CardProof
 npm run dev
 ```
 
-Open **`http://localhost:5173`** (Vite is configured with `--host` and proxies `/api` to port 3001).
+Open `**http://localhost:5173**` (Vite is configured with `--host` and proxies `/api` to port 3001).
 
 ### 3. Use the app
 
@@ -153,12 +157,14 @@ Serve the `CardProof/dist` output behind a reverse proxy that also routes `/api`
 
 ## API Reference (backend)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Liveness check |
-| `POST` | `/api/grade` | Multipart fields `frontImage` and `backImage` → JSON `{ card_name, card_type, grade, reason }` |
-| `POST` | `/api/mint` | Multipart `cardImage` + body fields (`email`, `cardName`, `grade`, etc.) → Crossmint mint |
-| `GET` | `/api/mint/:nftId` | Poll Crossmint NFT status / mint hash |
+
+| Method | Path               | Description                                                                                    |
+| ------ | ------------------ | ---------------------------------------------------------------------------------------------- |
+| `GET`  | `/health`          | Liveness check                                                                                 |
+| `POST` | `/api/grade`       | Multipart fields `frontImage` and `backImage` → JSON `{ card_name, card_type, grade, reason }` |
+| `POST` | `/api/mint`        | Multipart `cardImage` + body fields (`email`, `cardName`, `grade`, etc.) → Crossmint mint      |
+| `GET`  | `/api/mint/:nftId` | Poll Crossmint NFT status / mint hash                                                          |
+
 
 Uploaded images are limited to **25 MB** per file on the server.
 
@@ -178,6 +184,14 @@ The frontend IDL is mirrored under `CardProof/src/lib/idl/` for the wallet integ
 
 ---
 
+## Roadmap
+
+The current `tcg_marketplace` flow is effectively an **atomic swap**: listing, purchase, and delisting each settle in a small number of transactions with immediate escrow release. For **physical vault logistics**—shipping, intake, custody, grading windows, and outbound delivery—that model is too coarse.
+
+A planned upgrade is to evolve the program into a **multi-day state machine** on-chain: explicit states and transitions (for example deposit, in transit, received at vault, held for grading, listed, sold, and released or withdrawn) with **time-bounded steps**, **role-gated actions** (seller, vault operator, buyer), and hooks for **disputes or timeouts** where the chain cannot assume same-block completion. That lets custody, SLAs, and settlement stay aligned with real-world operations instead of treating the trade as a single atomic exchange.
+
+---
+
 ## Repository layout
 
 ```
@@ -193,6 +207,7 @@ tcg-grader/
 ## Troubleshooting
 
 - **Grading always shows a fallback grade** — Confirm `GROQ_API_KEY` in `backend/.env` and that the backend console shows no Groq errors.
-- **`/api` 404 or network errors in the browser** — Ensure the backend is running on port **3001** or update `CardProof/vite.config.ts` `server.proxy['/api'].target`.
+- `**/api` 404 or network errors in the browser** — Ensure the backend is running on port **3001** or update `CardProof/vite.config.ts` `server.proxy['/api'].target`.
 - **Wallet / Devnet** — The app uses **Solana Devnet**. Fund Devnet SOL via a faucet if transactions fail.
 - **Crossmint mint failures** — Verify staging keys and collection ID; minting is tied to Crossmint’s staging API in the current server implementation.
+
