@@ -17,7 +17,7 @@ Once minted, users can interact with our custom Rust smart contract to list thei
 ---
 
 ### 🚀 Live Demo & Video
-*   **Live Demo (Vercel):** `[INSERT_YOUR_VERCEL_LINK_HERE]`
+*   **Live Demo (Vercel):** https://cardproof-henna.vercel.app/
 *   **Demo Video (YouTube/Loom):** `[INSERT_YOUR_VIDEO_LINK_HERE]`
 
 ---
