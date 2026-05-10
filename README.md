@@ -1,70 +1,222 @@
-# 🃏 CardProof: AI-Verified TCG Marketplace
+# TCG Grader (CardProof)
 
-### Project Description
-CardProof is an end-to-end, trustless Web3 marketplace for grading and trading Pokémon and Trading Card Game (TCG) cards. Users upload photos of their raw cards, which are instantly graded by an AI Vision model (Groq/LLaMA-3). The certified grade and image are seamlessly minted natively to the Solana blockchain as an SPL Token NFT. 
+CardProof is a full-stack demo for **AI-assisted trading card grading** and **Solana NFT workflows**. Users upload front and back photos of a card, receive a structured grade inspired by PSA-style criteria, and can mint or trade representations on-chain.
 
-Once minted, users can interact with our custom Rust smart contract to list their cards on the decentralized marketplace, where atomic transactions ensure trustless Escrow vaults hold the cards until a buyer purchases them using native SOL.
-
----
-
-### 🏆 Hackathon Qualification Checklist
-- [x] **Project Name & Short Description**: CardProof - AI TCG Grading & Marketplace.
-- [x] **Unique Solana Program**: Written in Rust (Anchor framework) to handle Listings, Atomic Buys, and Escrow Token Account management.
-- [x] **Contract Deployment**: Deployed and fully active on Solana Devnet.
-- [x] **Public GitHub Repo**: You are here! README includes setup instructions below.
-- [x] **Demo Video & Live Demo**: Links provided below.
+> **Note:** Grades are produced by a vision language model for demonstration only. They are not official certifications from PSA, BGS, CGC, or any third-party grader.
 
 ---
 
-### 🚀 Live Demo & Video
-*   **Live Demo (Vercel):** https://cardproof-henna.vercel.app/
-*   **Demo Video (YouTube/Loom):** `[INSERT_YOUR_VIDEO_LINK_HERE]`
+## Overview
+
+The repository is organized into three parts:
+
+
+| Package           | Role                                                                                                                                                                         |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `**CardProof/`**  | React single-page app: upload flow, results, wallet connection (Phantom on **Solana Devnet**), optional Crossmint minting, and a marketplace UI backed by an Anchor program. |
+| `**backend/`**    | Express API: accepts card images, calls **Groq**’s OpenAI-compatible vision API for grading, and integrates **Crossmint** (staging) for email/wallet NFT delivery.           |
+| `**blockchain/`** | **Anchor** program `tcg_marketplace`: escrow listings, purchases with SOL, and delisting for SPL NFTs.                                                                       |
+
+
+In local development, the Vite dev server proxies `/api/`* to the backend so the browser can call grading and mint endpoints without CORS friction.
 
 ---
 
-### 📜 Contract Deployment (Devnet)
-Our custom Rust (Anchor) marketplace smart contract is actively deployed on Solana Devnet at the following address:
-**Program ID:** `9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W`
+## Tech Stack
+
+**Frontend (`CardProof/`)**
+
+- [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- [Vite 5](https://vitejs.dev/) (dev server, build)
+- [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) patterns (Radix primitives)
+- [React Router](https://reactrouter.com/) v6
+- [Solana Web3.js](https://solana-labs.github.io/solana-web3.js/) + [Anchor 0.30](https://www.anchor-lang.com/) client
+- [@solana/wallet-adapter](https://github.com/solana-labs/wallet-adapter) (Phantom)
+- [Framer Motion](https://www.framer.com/motion/), [Recharts](https://recharts.org/), [Lucide](https://lucide.dev/) icons
+
+**Backend (`backend/`)**
+
+- [Node.js](https://nodejs.org/) + [Express 4](https://expressjs.com/)
+- [Multer](https://github.com/expressjs/multer) (multipart uploads)
+- [Groq](https://groq.com/) via OpenAI-compatible client (`openai` package)
+- [Crossmint](https://www.crossmint.com/) REST API (staging)
+
+**On-chain (`blockchain/`)**
+
+- [Anchor](https://www.anchor-lang.com/) + [Rust](https://www.rust-lang.org/) (toolchain pinned in `blockchain/rust-toolchain.toml`)
+- [Solana](https://solana.com/) program: list / buy / delist with SPL token transfers
 
 ---
 
-### 🌟 Bonus Points: Consistent & Considerable use of Solana SDKs
-We heavily utilized `@solana/web3.js` and `@solana/spl-token` natively in the browser to build a rich Web3 experience without relying entirely on third-party custodial APIs:
-1.  **Native Front-end Minting:** Instead of using an API, our React frontend builds and signs complex transactions to natively create SPL Token Mints and Associated Token Accounts (ATAs) dynamically via the Phantom Wallet.
-2.  **RPC Escrow Resolution:** Instead of relying on local databases to track smart-contract Escrow accounts, our UI dynamically queries the Solana blockchain via `getTokenAccountsByOwner` to locate the exact PDA-owned Vault holding the NFT.
-3.  **Atomic Buys:** Our frontend crafts transactions that utilize `.preInstructions` to dynamically create missing ATAs for buyers on the fly, followed by atomic CPI transfers of SOL and SPL tokens in a single instruction.
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+* **Node.js 18+** (20 LTS recommended) and **npm** or **Yarn**
+* **[Rust](https://www.rust-lang.org/tools/install)**
+* **[Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools)** (v1.16+)
+* **[Anchor CLI](https://www.anchor-lang.com/docs/installation)** (v0.30.0)
 
 ---
 
-### 🛠️ Local Setup Instructions
+## Installation
 
-#### Prerequisites
-*   Node.js (v18+)
-*   Phantom Wallet extension installed on your browser (set to Devnet)
+Clone the repository and install dependencies **per package** (there is no root `package.json`).
 
-#### 1. Start the React Frontend
-```bash
-cd CardProof
-npm install
-npm run dev
-```
+### Backend
 
-#### 2. Start the AI Grading Backend
-Open a new terminal window:
 ```bash
 cd backend
 npm install
-
-# Create a .env file and add your Groq API Key for the AI Vision model
-echo "GROQ_API_KEY=your_key_here" > .env
-
-node server.js
+cp .env.example .env
+# Edit .env with your Groq and Crossmint staging keys (see below)
 ```
 
-#### 3. Test the Flow
-1. Connect your Phantom wallet.
-2. Upload a trading card photo (e.g., front and back of a Pokémon card).
-3. Wait ~5 seconds for the AI to analyze and grade the centering, corners, and surface.
-4. Click **Mint** to natively create an SPL Token of your graded card.
-5. Go to the Marketplace and click **List**. Your card will be transferred to a PDA Escrow Vault.
-6. Switch wallets (or use the same one) to click **Buy** and watch the atomic smart contract swap SOL for the NFT!
+### Frontend
+
+```bash
+cd CardProof
+npm install
+```
+
+### Blockchain (optional — for building or testing the program)
+
+```bash
+cd blockchain
+# Anchor.toml uses yarn for scripts; install deps with npm or yarn as you prefer
+npm install
+# or: yarn install
+```
+
+---
+
+## Configuration
+
+Backend environment variables are documented in `backend/.env.example`. Summary:
+
+
+| Variable                  | Purpose                                                 |
+| ------------------------- | ------------------------------------------------------- |
+| `GROQ_API_KEY`            | Authenticates requests to Groq for vision-based grading |
+| `CROSSMINT_API_KEY`       | Crossmint staging API key for `/api/mint`               |
+| `CROSSMINT_COLLECTION_ID` | Target collection for minted NFTs                       |
+| `PORT`                    | HTTP port (default **3001**)                            |
+
+
+Copy `backend/.env.example` to `backend/.env` and fill in real values before running the API.
+
+---
+
+## How to Run
+
+You need **both** the backend and the frontend for the full flow (upload → grade → result → mint).
+
+### 1. Start the API
+
+```bash
+cd backend
+npm start
+```
+
+For auto-reload during development:
+
+```bash
+npm run dev
+```
+
+The server listens on `http://localhost:3001` by default. A quick health check:
+
+```bash
+curl http://localhost:3001/health
+```
+
+### 2. Start the web app
+
+In a second terminal:
+
+```bash
+cd CardProof
+npm run dev
+```
+
+Open `**http://localhost:5173**` (Vite is configured with `--host` and proxies `/api` to port 3001).
+
+### 3. Use the app
+
+1. **Home (`/`)** — Upload front and back images, then continue to results.
+2. **Result (`/result`)** — Calls `POST /api/grade` with compressed images. With a connected Phantom wallet on Devnet, minting can use a **native SPL mint** path; without a wallet, email-based minting uses **Crossmint** via `POST /api/mint`.
+3. **Marketplace (`/marketplace`)** — Browse demo listings and interact with the deployed `tcg_marketplace` program on Devnet (wallet required for real transactions).
+
+### Production build (frontend only)
+
+```bash
+cd CardProof
+npm run build
+npm run preview   # optional local preview of the production bundle
+```
+
+Serve the `CardProof/dist` output behind a reverse proxy that also routes `/api` to your Node backend, or deploy the API under the same origin.
+
+---
+
+## API Reference (backend)
+
+
+| Method | Path               | Description                                                                                    |
+| ------ | ------------------ | ---------------------------------------------------------------------------------------------- |
+| `GET`  | `/health`          | Liveness check                                                                                 |
+| `POST` | `/api/grade`       | Multipart fields `frontImage` and `backImage` → JSON `{ card_name, card_type, grade, reason }` |
+| `POST` | `/api/mint`        | Multipart `cardImage` + body fields (`email`, `cardName`, `grade`, etc.) → Crossmint mint      |
+| `GET`  | `/api/mint/:nftId` | Poll Crossmint NFT status / mint hash                                                          |
+
+
+Uploaded images are limited to **25 MB** per file on the server.
+
+---
+
+##  Blockchain Program
+
+The Anchor program in `blockchain/programs/tcg_marketplace` acts as a decentralized escrow for the marketplace. It manages the state transitions for listing, purchasing, and delisting trading cards as SPL NFTs.
+
+###  Live Deployment
+* **Network:** Solana Devnet
+* **Program ID:** `9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W`
+* **Explorer Link:** [View on Solana Explorer](https://explorer.solana.com/address/9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W?cluster=devnet)
+
+### Local Build & Test Instructions
+If you want to modify the program or verify the logic locally:
+
+1. **Install Dependencies:**
+   ```bash
+   cd blockchain
+   yarn install
+
+---
+
+## Roadmap
+
+The current `tcg_marketplace` flow is effectively an **atomic swap**: listing, purchase, and delisting each settle in a small number of transactions with immediate escrow release. For **physical vault logistics**—shipping, intake, custody, grading windows, and outbound delivery—that model is too coarse.
+
+A planned upgrade is to evolve the program into a **multi-day state machine** on-chain: explicit states and transitions (for example deposit, in transit, received at vault, held for grading, listed, sold, and released or withdrawn) with **time-bounded steps**, **role-gated actions** (seller, vault operator, buyer), and hooks for **disputes or timeouts** where the chain cannot assume same-block completion. That lets custody, SLAs, and settlement stay aligned with real-world operations instead of treating the trade as a single atomic exchange.
+
+---
+
+## Repository layout
+
+```
+tcg-grader/
+├── CardProof/          # Vite + React frontend
+├── backend/            # Express API (.env from .env.example)
+├── blockchain/         # Anchor workspace (tcg_marketplace)
+└── README.md
+```
+
+---
+
+## Troubleshooting
+
+- **Grading always shows a fallback grade** — Confirm `GROQ_API_KEY` in `backend/.env` and that the backend console shows no Groq errors.
+- `**/api` 404 or network errors in the browser** — Ensure the backend is running on port **3001** or update `CardProof/vite.config.ts` `server.proxy['/api'].target`.
+- **Wallet / Devnet** — The app uses **Solana Devnet**. Fund Devnet SOL via a faucet if transactions fail.
+- **Crossmint mint failures** — Verify staging keys and collection ID; minting is tied to Crossmint’s staging API in the current server implementation.
+
