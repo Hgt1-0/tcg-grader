@@ -179,7 +179,9 @@ The frontend IDL is mirrored under `CardProof/src/lib/idl/` for the wallet integ
 ---
 ## Roadmap
 The current `tcg_marketplace` flow is effectively an **atomic swap**: listing, purchase, and delisting each settle in a small number of transactions with immediate escrow release. For **physical vault logistics**—shipping, intake, custody, grading windows, and outbound delivery—that model is too coarse.
+
 A planned upgrade is to evolve the program into a **multi-day state machine** on-chain: explicit states and transitions (for example deposit, in transit, received at vault, held for grading, listed, sold, and released or withdrawn) with **time-bounded steps**, **role-gated actions** (seller, vault operator, buyer), and hooks for **disputes or timeouts** where the chain cannot assume same-block completion. That lets custody, SLAs, and settlement stay aligned with real-world operations instead of treating the trade as a single atomic exchange.
+
 ---
 
 ## Repository layout
