@@ -26,9 +26,9 @@ const ListCardModal: React.FC<ListCardModalProps> = ({ open, onOpenChange, onLis
   const [priceSOL, setPriceSOL] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
 
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { setVisible } = useWalletModal();
-  const { program, wallet } = useProgram();
+  const { program, wallet, connection } = useProgram();
   const { toast } = useToast();
 
   const handleList = async () => {
@@ -62,12 +62,16 @@ const ListCardModal: React.FC<ListCardModalProps> = ({ open, onOpenChange, onLis
       const { getAssociatedTokenAddress } = await import("@solana/spl-token");
       const sellerAta = await getAssociatedTokenAddress(mint, wallet.publicKey);
 
+      if (!signTransaction) throw new Error("Wallet does not support signTransaction");
+
       const { sig, escrowPubkey } = await listNft(
         program,
         wallet.publicKey,
         mint,
         sellerAta,
-        price
+        price,
+        signTransaction,
+        connection
       );
 
       // Persist escrow pubkey locally so buy/delist can reference it

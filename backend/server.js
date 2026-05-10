@@ -65,7 +65,10 @@ A PSA 2 card's corners show accelerated rounding and surface wear is starting to
 A PSA 1.5 card's corners will show extreme wear, possibly affecting framing of the picture. The surface of the card will show advanced stages of wear, including scuffing, scratching, pitting, chipping and staining.
 A PSA 1 will exhibit many of the same qualities of a PSA 1.5 but the defects may have advanced to such a serious stage that the eye appeal of the card has nearly vanished in its entirety.
 Return EXACTLY a JSON object with these keys: 
-"grade" (string, e.g., "PSA 8"), and "reason" (string, a short 1-sentence explanation of the flaws found on either the front or the back).`,
+"card_name" (string, identify the specific character or item, e.g., "Charizard Holo"),
+"card_type" (string, the series or game, e.g., "Pokemon Base Set"),
+"grade" (string, e.g., "PSA 8"), and 
+"reason" (string, a short 1-sentence explanation of the flaws found).`,
           },
           // Few-shot: perfect card
           {
@@ -79,7 +82,7 @@ Return EXACTLY a JSON object with these keys:
           },
           {
             role: "assistant",
-            content: `{"grade": "PSA 10", "reason": "Flawless 50/50 centering, sharp corners, and pristine edges."}`,
+            content: `{"card_name": "Charizard Holo", "card_type": "Pokemon Base Set", "grade": "PSA 10", "reason": "Flawless 50/50 centering, sharp corners, and pristine edges."}`,
           },
           // Few-shot: damaged card
           {
@@ -90,7 +93,7 @@ Return EXACTLY a JSON object with these keys:
           },
           {
             role: "assistant",
-            content: `{"grade": "PSA 4", "reason": "Severe whitening on the bottom edges, rounded corners, and a noticeable surface scratch."}`,
+            content: `{"card_name": "Pikachu", "card_type": "Pokemon Base Set", "grade": "PSA 4", "reason": "Severe whitening on the bottom edges, rounded corners, and a noticeable surface scratch."}`,
           },
           // Real request
           {
@@ -114,6 +117,8 @@ Return EXACTLY a JSON object with these keys:
       console.error("Grading Error:", error?.message ?? error);
       // Fallback so the UI always gets a valid response
       return res.json({
+        card_name: "Unknown Card",
+        card_type: "Trading Card",
         grade: "PSA 8",
         reason: "Fallback grade: could not process images. Check API key or token limit.",
       });

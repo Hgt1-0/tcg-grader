@@ -13,6 +13,8 @@ import {
   SystemProgram,
   LAMPORTS_PER_SOL,
   SYSVAR_RENT_PUBKEY,
+  TransactionMessage,
+  VersionedTransaction,
 } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import type { TcgMarketplace, Listing } from "./idl/types";
@@ -38,21 +40,26 @@ export function findListingPda(nftMint: PublicKey): [PublicKey, number] {
  *
  * @param priceInSol  Price in SOL (converted to lamports internally)
  */
+import { Transaction } from "@solana/web3.js";
+
 export async function listNft(
   program: Program<TcgMarketplace>,
   seller: PublicKey,
   nftMint: PublicKey,
   sellerNftTokenAccount: PublicKey,
-  priceInSol: number
+  priceInSol: number,
+  signTransaction: any,
+  connection: any
 ): Promise<{ sig: string; escrowPubkey: string }> {
   const [listing] = findListingPda(nftMint);
   const price = new BN(Math.floor(priceInSol * LAMPORTS_PER_SOL));
 
-  // Fresh keypair for the escrow token account (initialized by the program)
+  // Fresh keypair for the escrow token account
   const escrowKeypair = web3.Keypair.generate();
 
-  // Build raw transaction (do NOT use .rpc() — wallet adapter can drop co-signers)
-  const tx = await (program.methods as any)
+  // 1. Build the actual 'list' instruction
+  // The Rust smart contract handles the account creation internally via CPI because of the `init` macro.
+  const listIx = await (program.methods as any)
     .list(price)
     .accounts({
       seller,
@@ -64,22 +71,34 @@ export async function listNft(
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY,
     })
-    .transaction();
+    .instruction();
 
-  // Attach blockhash + fee payer before partial sign
-  const conn = program.provider.connection;
-  const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
+  // **CRITICAL FIX**: The IDL is missing the "signer" flag for the escrow account,
+  // but it is required because the Rust code creates it via CPI.
+  const escrowKeyIndex = listIx.keys.findIndex(k => k.pubkey.equals(escrowKeypair.publicKey));
+  if (escrowKeyIndex !== -1) {
+    listIx.keys[escrowKeyIndex].isSigner = true;
+  }
+
+  // 2. Construct standard legacy Transaction
+  const tx = new Transaction().add(listIx);
+
+  // 4. Get latest blockhash and set fee payer
+  const { blockhash } = await connection.getLatestBlockhash();
   tx.recentBlockhash = blockhash;
   tx.feePayer = seller;
 
-  // Escrow keypair must sign first (it's paying rent for its own account init)
-  tx.partialSign(escrowKeypair);
+  // 5. Raw sign and send sequence
+  // We use signTransaction to get Phantom's signature first so it doesn't strip our partial sign.
+  const signedTx = await signTransaction(tx);
+  
+  // Now we safely add our escrow keypair's signature locally
+  signedTx.partialSign(escrowKeypair);
 
-  // Wallet adapter signs + submits
-  const sig = await (program.provider as any).sendAndConfirm(tx, [escrowKeypair], {
-    commitment: "confirmed",
-    maxRetries: 3,
-  });
+  // Submit to RPC directly to get detailed error logs if it fails on-chain
+  const rawTx = signedTx.serialize();
+  const sig = await connection.sendRawTransaction(rawTx, { skipPreflight: false });
+  await connection.confirmTransaction(sig, "confirmed");
 
   return { sig, escrowPubkey: escrowKeypair.publicKey.toBase58() };
 }

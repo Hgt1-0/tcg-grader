@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import CardDisplay from "@/components/CardDisplay";
 import GradeBar from "@/components/GradeBar";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 
 // ── PSA grade helpers ─────────────────────────────────────────────────────────
 
@@ -80,6 +80,8 @@ interface LocationState {
 }
 
 interface GradeResult {
+  card_name?: string;
+  card_type?: string;
   grade: string;
   reason: string;
 }
@@ -90,7 +92,8 @@ const Result: React.FC = () => {
   const navigate   = useNavigate();
   const location   = useLocation();
   const state      = location.state as LocationState | null;
-  const { publicKey } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
+  const { connection } = useConnection();
 
   const [result,    setResult]    = useState<GradeResult | null>(null);
   const [loading,   setLoading]   = useState(true);
@@ -136,7 +139,12 @@ const Result: React.FC = () => {
       } catch (err: any) {
         setApiError(err?.message ?? "Failed to reach grading server.");
         // Fallback so the page still renders something
-        setResult({ grade: "PSA 8", reason: "Could not connect to grading server — showing fallback grade." });
+        setResult({
+          card_name: "Unknown Card",
+          card_type: "Trading Card",
+          grade: "PSA 8",
+          reason: "Could not connect to grading server — showing fallback grade."
+        });
       } finally {
         setLoading(false);
       }
@@ -153,12 +161,56 @@ const Result: React.FC = () => {
     setMintStatus("loading");
     setMintError(null);
     try {
-      // 1. Submit mint request
+      if (publicKey && sendTransaction && connection) {
+        // --- HACKATHON OVERRIDE: MINT NATIVELY TO AVOID CROSSMINT cNFT LOCK ---
+        const { Keypair, SystemProgram, Transaction } = await import("@solana/web3.js");
+        const { TOKEN_PROGRAM_ID, createInitializeMintInstruction, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createMintToInstruction, MINT_SIZE } = await import("@solana/spl-token");
+
+        const mintKeypair = Keypair.generate();
+        const lamports = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
+
+        const tx = new Transaction().add(
+          SystemProgram.createAccount({
+            fromPubkey: publicKey,
+            newAccountPubkey: mintKeypair.publicKey,
+            space: MINT_SIZE,
+            lamports,
+            programId: TOKEN_PROGRAM_ID,
+          }),
+          createInitializeMintInstruction(mintKeypair.publicKey, 0, publicKey, publicKey, TOKEN_PROGRAM_ID)
+        );
+
+        const ata = await getAssociatedTokenAddress(mintKeypair.publicKey, publicKey);
+        tx.add(
+          createAssociatedTokenAccountInstruction(publicKey, ata, publicKey, mintKeypair.publicKey)
+        );
+        tx.add(
+          createMintToInstruction(mintKeypair.publicKey, ata, publicKey, 1)
+        );
+
+        const { blockhash } = await connection.getLatestBlockhash();
+        tx.recentBlockhash = blockhash;
+        tx.feePayer = publicKey;
+
+        // Mint standard NFT directly via Phantom!
+        const sig = await sendTransaction(tx, connection, { signers: [mintKeypair] });
+        await connection.confirmTransaction(sig, "confirmed");
+
+        setMintResult({
+          message: "Standard NFT minted natively via your wallet!",
+          nftId: "native-mint",
+          mintAddress: mintKeypair.publicKey.toBase58(),
+        });
+        setMintStatus("done");
+        return;
+      }
+
+      // --- FALLBACK FOR NON-WALLET USERS (Email) ---
       const formData = new FormData();
       const compressed = await compressImage(state.frontFile);
       formData.append("cardImage", compressed);
       formData.append("email",     recipient);
-      formData.append("cardName",  fileName);
+      formData.append("cardName",  result.card_name || state.fileName);
       formData.append("grade",     result.grade);
       formData.append("reason",    result.reason ?? "");
 
@@ -168,7 +220,7 @@ const Result: React.FC = () => {
 
       const nftId = data.nftId;
 
-      // 2. Poll for on-chain confirmation (max 90s)
+      // Poll for on-chain confirmation
       let mintAddress: string | null = null;
       if (nftId && publicKey) {
         for (let i = 0; i < 18; i++) {

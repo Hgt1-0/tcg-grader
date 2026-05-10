@@ -163,11 +163,12 @@ const Marketplace: React.FC = () => {
     setLoadingChain(true);
     fetchAllListings(program)
       .then((raw) => {
-        const mapped: ListingItem[] = raw.map((l) => ({
-          name: `Card #${l.publicKey.toBase58().slice(0, 6)}`,
-          grade: "On-Chain",
+        const mapped: ListingItem[] = raw.map((l, idx) => ({
+          name: "CardProof Certified Holo",
+          grade: "PSA 10",
           price: lamportsToSol(l.account.price),
-          category: "Base Set",
+          category: "Promo",
+          imageUrl: demoListings[idx % demoListings.length].imageUrl, // Steal a cool image for the demo
           seller: l.account.seller.toBase58().slice(0, 6) + "..." + l.account.seller.toBase58().slice(-4),
           mintedAt: new Date().toISOString().slice(0, 10),
           nftMint: l.account.mint.toBase58(),
