@@ -117,6 +117,16 @@ export async function buyNft(
 ): Promise<string> {
   const [listing] = findListingPda(nftMint);
 
+  // Check if buyer has the ATA, if not, we must create it!
+  const { createAssociatedTokenAccountInstruction } = await import("@solana/spl-token");
+  const connection = program.provider.connection;
+  const buyerAtaInfo = await connection.getAccountInfo(buyerNftTokenAccount);
+  
+  const preIxs = [];
+  if (!buyerAtaInfo) {
+    preIxs.push(createAssociatedTokenAccountInstruction(buyer, buyerNftTokenAccount, buyer, nftMint));
+  }
+
   const sig = await (program.methods as any)
     .buy()
     .accounts({
@@ -128,6 +138,7 @@ export async function buyNft(
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
+    .preInstructions(preIxs)
     .rpc();
 
   return sig;

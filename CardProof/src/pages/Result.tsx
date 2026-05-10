@@ -128,7 +128,8 @@ const Result: React.FC = () => {
         formData.append("frontImage", compressedFront);
         formData.append("backImage",  compressedBack);
 
-        const res = await fetch("/api/grade", {
+        const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+        const res = await fetch(`${baseUrl}/api/grade`, {
           method: "POST",
           body: formData,
         });
@@ -192,14 +193,30 @@ const Result: React.FC = () => {
         tx.recentBlockhash = blockhash;
         tx.feePayer = publicKey;
 
-        // Mint standard NFT directly via Phantom!
         const sig = await sendTransaction(tx, connection, { signers: [mintKeypair] });
         await connection.confirmTransaction(sig, "confirmed");
+
+        // --- LOCALSTORAGE HACK FOR DEMO ---
+        // Save the image & name locally so the Marketplace UI can show what we actually uploaded!
+        const mintStr = mintKeypair.publicKey.toBase58();
+        localStorage.setItem(`card_name_${mintStr}`, result.card_name || state.fileName);
+        
+        const compressedImg = await compressImage(state.frontFile);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          try {
+            localStorage.setItem(`card_img_${mintStr}`, reader.result as string);
+          } catch (e) {
+            console.error("Local storage quota exceeded, using fallback image.");
+          }
+        };
+        reader.readAsDataURL(compressedImg);
+        // ----------------------------------
 
         setMintResult({
           message: "Standard NFT minted natively via your wallet!",
           nftId: "native-mint",
-          mintAddress: mintKeypair.publicKey.toBase58(),
+          mintAddress: mintStr,
         });
         setMintStatus("done");
         return;
@@ -214,7 +231,8 @@ const Result: React.FC = () => {
       formData.append("grade",     result.grade);
       formData.append("reason",    result.reason ?? "");
 
-      const res = await fetch("/api/mint", { method: "POST", body: formData });
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+      const res = await fetch(`${baseUrl}/api/mint`, { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Minting failed.");
 
@@ -225,7 +243,8 @@ const Result: React.FC = () => {
       if (nftId && publicKey) {
         for (let i = 0; i < 18; i++) {
           await new Promise(r => setTimeout(r, 5000));
-          const poll = await fetch(`/api/mint/${nftId}`).then(r => r.json());
+          const baseUrl = import.meta.env.VITE_BACKEND_URL || "";
+          const poll = await fetch(`${baseUrl}/api/mint/${nftId}`).then(r => r.json());
           if (poll.status === "success" && poll.mintHash) {
             mintAddress = poll.mintHash;
             break;

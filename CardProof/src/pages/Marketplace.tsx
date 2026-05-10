@@ -15,7 +15,7 @@ const demoListings = [
   {
     name: "Charizard Holo",
     grade: "PSA 9",
-    price: "120.0",
+    price: "8.5",
     category: "Base Set",
     imageUrl: "https://images.pokemontcg.io/base1/4_hires.png",
     seller: "7xKp...3Fqr",
@@ -24,7 +24,7 @@ const demoListings = [
   {
     name: "Blastoise Holo",
     grade: "PSA 8",
-    price: "45.0",
+    price: "1.2",
     category: "Base Set",
     imageUrl: "https://images.pokemontcg.io/base1/2_hires.png",
     seller: "1cAh...6Srv",
@@ -33,7 +33,7 @@ const demoListings = [
   {
     name: "Venusaur Holo",
     grade: "PSA 7",
-    price: "32.0",
+    price: "0.85",
     category: "Base Set",
     imageUrl: "https://images.pokemontcg.io/base1/15_hires.png",
     seller: "4pGs...7Tnv",
@@ -42,7 +42,7 @@ const demoListings = [
   {
     name: "Mewtwo Holo",
     grade: "PSA 9",
-    price: "55.0",
+    price: "1.5",
     category: "Base Set",
     imageUrl: "https://images.pokemontcg.io/base1/10_hires.png",
     seller: "9nWq...2Lpx",
@@ -51,7 +51,7 @@ const demoListings = [
   {
     name: "Raichu Holo",
     grade: "PSA 8",
-    price: "28.0",
+    price: "0.6",
     category: "Base Set",
     imageUrl: "https://images.pokemontcg.io/base1/14_hires.png",
     seller: "3mRt...9Ykz",
@@ -60,7 +60,7 @@ const demoListings = [
   {
     name: "Gyarados Holo",
     grade: "PSA 8",
-    price: "22.5",
+    price: "0.5",
     category: "Base Set",
     imageUrl: "https://images.pokemontcg.io/base1/6_hires.png",
     seller: "5vBj...8Dmn",
@@ -69,34 +69,34 @@ const demoListings = [
   {
     name: "Gengar Holo",
     grade: "PSA 9",
-    price: "38.0",
+    price: "1.2",
     category: "Fossil",
-    imageUrl: "https://images.pokemontcg.io/fossil/5_hires.png",
+    imageUrl: "https://images.pokemontcg.io/base3/5_hires.png",
     seller: "3xAb...7Hcq",
     mintedAt: "2025-03-10",
   },
   {
     name: "Lapras Holo",
     grade: "PSA 8",
-    price: "18.0",
+    price: "0.45",
     category: "Fossil",
-    imageUrl: "https://images.pokemontcg.io/fossil/10_hires.png",
+    imageUrl: "https://images.pokemontcg.io/base3/10_hires.png",
     seller: "7yPn...2Wks",
     mintedAt: "2025-02-14",
   },
   {
     name: "Dragonite Holo",
     grade: "PSA 7",
-    price: "24.0",
+    price: "0.65",
     category: "Fossil",
-    imageUrl: "https://images.pokemontcg.io/fossil/4_hires.png",
+    imageUrl: "https://images.pokemontcg.io/base3/4_hires.png",
     seller: "5mZr...9Flj",
     mintedAt: "2025-04-19",
   },
   {
     name: "Lugia Holo",
     grade: "PSA 10",
-    price: "200.0",
+    price: "15.0",
     category: "Neo Genesis",
     imageUrl: "https://images.pokemontcg.io/neo1/9_hires.png",
     seller: "2rCd...5Wzp",
@@ -105,7 +105,7 @@ const demoListings = [
   {
     name: "Typhlosion Holo",
     grade: "PSA 9",
-    price: "42.0",
+    price: "1.8",
     category: "Neo Genesis",
     imageUrl: "https://images.pokemontcg.io/neo1/18_hires.png",
     seller: "6kFm...1Jqt",
@@ -114,7 +114,7 @@ const demoListings = [
   {
     name: "Pikachu Illustrator",
     grade: "PSA 10",
-    price: "500.0",
+    price: "250.0",
     category: "Promo",
     imageUrl: "https://images.pokemontcg.io/basep/1_hires.png",
     seller: "8aLs...4Vbn",
@@ -129,6 +129,7 @@ type ListingItem = {
   category: string;
   imageUrl?: string;
   seller?: string;
+  sellerFull?: string;
   mintedAt?: string;
   nftMint?: string;
   onChain?: boolean;
@@ -163,17 +164,24 @@ const Marketplace: React.FC = () => {
     setLoadingChain(true);
     fetchAllListings(program)
       .then((raw) => {
-        const mapped: ListingItem[] = raw.map((l, idx) => ({
-          name: "CardProof Certified Holo",
-          grade: "PSA 10",
-          price: lamportsToSol(l.account.price),
-          category: "Promo",
-          imageUrl: demoListings[idx % demoListings.length].imageUrl, // Steal a cool image for the demo
-          seller: l.account.seller.toBase58().slice(0, 6) + "..." + l.account.seller.toBase58().slice(-4),
-          mintedAt: new Date().toISOString().slice(0, 10),
-          nftMint: l.account.mint.toBase58(),
-          onChain: true,
-        }));
+        const mapped: ListingItem[] = raw.map((l, idx) => {
+          const mintStr = l.account.mint.toBase58();
+          const localName = localStorage.getItem(`card_name_${mintStr}`);
+          const localImg = localStorage.getItem(`card_img_${mintStr}`);
+
+          return {
+            name: localName || "CardProof Certified Holo",
+            grade: "PSA 10",
+            price: lamportsToSol(l.account.price),
+            category: "Promo",
+            imageUrl: localImg || demoListings[idx % demoListings.length].imageUrl,
+            seller: l.account.seller.toBase58().slice(0, 6) + "..." + l.account.seller.toBase58().slice(-4),
+            sellerFull: l.account.seller.toBase58(),
+            mintedAt: new Date().toISOString().slice(0, 10),
+            nftMint: mintStr,
+            onChain: true,
+          };
+        });
         setChainListings(mapped);
       })
       .catch(console.error)

@@ -174,6 +174,11 @@ const Index: React.FC = () => {
             </p>
           </div>
 
+          {/* 3D Interactive Card */}
+          <div className="w-full h-[500px] mt-12 mb-8 relative rounded-3xl overflow-hidden shadow-2xl border border-white/5 bg-black/20 fade-in-up fade-in-up-delay-2 pointer-events-auto">
+            <iframe src="/3dcard.html" className="w-full h-full border-0 pointer-events-auto" title="3D Pokemon Card" />
+          </div>
+
           {/* CTA hints */}
           <div className="flex justify-center gap-3 mt-8 fade-in-up fade-in-up-delay-2">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

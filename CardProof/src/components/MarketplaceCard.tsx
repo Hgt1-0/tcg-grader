@@ -50,6 +50,7 @@ function gradeToBreakdown(grade: string) {
 const MarketplaceCard: React.FC<MarketplaceCardProps> = ({
   name, grade, price, imageUrl, category, index = 0,
   seller = "8xKp...3Fqr",
+  sellerFull,
   mintedAt = "2025-04-12",
   nftMint,
   onChain = false,
@@ -68,8 +69,8 @@ const MarketplaceCard: React.FC<MarketplaceCardProps> = ({
   const { toast } = useToast();
 
   // Is the connected wallet the seller of this on-chain listing?
-  const isOwner = onChain && publicKey && seller &&
-    publicKey.toBase58().startsWith(seller.split("...")[0]) === true;
+  const isOwner = onChain && publicKey && sellerFull &&
+    publicKey.toBase58() === sellerFull;
 
   const handleBuy = async () => {
     if (!publicKey) {
@@ -79,22 +80,23 @@ const MarketplaceCard: React.FC<MarketplaceCardProps> = ({
 
     setBuyStatus("loading");
     try {
-      if (onChain && nftMint && program && wallet.publicKey) {
+      if (onChain && nftMint && program && wallet.publicKey && sellerFull) {
         // ── Real on-chain buy ──────────────────────────────────────────────
-        // buyer's NFT token account must exist — wallet adapter handles ATA creation
-        // For now we need the buyer's associated token account for this mint
         const { getAssociatedTokenAddress } = await import("@solana/spl-token");
         const mint = new PublicKey(nftMint);
         const buyerAta = await getAssociatedTokenAddress(mint, wallet.publicKey);
-        // escrow ATA is derived from the listing PDA + mint
         const { findListingPda } = await import("@/lib/blockchain");
         const [listingPda] = findListingPda(mint);
-        const escrowAta = await getAssociatedTokenAddress(mint, listingPda, true);
+        
+        // Fetch the actual escrow account owned by the Listing PDA
+        const escrowAccounts = await program.provider.connection.getTokenAccountsByOwner(listingPda, { mint });
+        if (escrowAccounts.value.length === 0) throw new Error("Escrow account not found on-chain.");
+        const escrowAta = escrowAccounts.value[0].pubkey;
 
         const sig = await buyNft(
           program,
           wallet.publicKey,
-          new PublicKey(seller.replace("...", "1111111111111111111111")), // real seller from on-chain
+          new PublicKey(sellerFull), // REAL seller from on-chain!
           mint,
           escrowAta,
           buyerAta
@@ -119,21 +121,20 @@ const MarketplaceCard: React.FC<MarketplaceCardProps> = ({
       const { getAssociatedTokenAddress } = await import("@solana/spl-token");
       const mint = new PublicKey(nftMint);
       const sellerAta = await getAssociatedTokenAddress(mint, wallet.publicKey);
-      const stored = JSON.parse(localStorage.getItem("cardproof_escrows") ?? "{}");
-      const escrowPubkey = stored[mint.toBase58()];
-      if (!escrowPubkey) throw new Error("Escrow account not found. Was this card listed from this browser?");
+      
+      const { findListingPda } = await import("@/lib/blockchain");
+      const [listingPda] = findListingPda(mint);
+      const escrowAccounts = await program.provider.connection.getTokenAccountsByOwner(listingPda, { mint });
+      if (escrowAccounts.value.length === 0) throw new Error("Escrow account not found on-chain.");
+      const escrowPubkey = escrowAccounts.value[0].pubkey;
 
       const sig = await delistNft(
         program,
         wallet.publicKey,
         mint,
-        new PublicKey(escrowPubkey),
+        escrowPubkey,
         sellerAta
       );
-
-      // Remove from local escrow store
-      delete stored[mint.toBase58()];
-      localStorage.setItem("cardproof_escrows", JSON.stringify(stored));
 
       setDelistStatus("done");
       toast({ title: "Card Delisted", description: `Tx: ${sig.slice(0, 16)}…` });
