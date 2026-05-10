@@ -172,7 +172,12 @@ Uploaded images are limited to **25 MB** per file on the server.
 
 ## Blockchain program
 
-**Devnet Program ID:** `9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W`
+**Live Deployment:**
+* **Network:** Solana Devnet
+* **Blockchain:** Solana
+* **Framework:** Anchor
+* **Language:** Rust
+* **Program ID:** `9hFDdjtxZPGe3fnA2wbpAZwXDmqjLYFFhjVXsv1obv1W`
 
 The Anchor program in `blockchain/programs/tcg_marketplace` implements marketplace instructions (`list`, `buy`, `delist`). Program ID and cluster defaults live in `blockchain/Anchor.toml`. Run tests (after installing Anchor and Solana tooling):
 
